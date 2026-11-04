@@ -46,6 +46,16 @@ jobs:
           }
           if ($bad) { exit 1 }
 
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+
+      - name: Python lint (ruff, versions from uv.lock)
+        run: |
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
+
+      - name: Python tests (pytest)
+        run: uv run --locked pytest -q
+
       - name: JSON configs (valid)
         run: |
           for f in $(git ls-files '*.json'); do python3 -m json.tool "$f" > /dev/null || { echo "::error file=$f::invalid JSON"; exit 1; }; done

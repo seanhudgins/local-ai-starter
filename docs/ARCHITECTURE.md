@@ -32,7 +32,7 @@ Ollama, Open WebUI's raw port, SSH, RDP and SMB are blocked, and an edge check s
 |---|---|---|
 | Network | Tailscale, deny-by-default policy, device approval, MFA at the identity provider | `services/tailscale/check-edge.sh` |
 | Model servers | Ollama and Open WebUI bound to 127.0.0.1; cloud features off | `check-mac.sh`, `server.log` |
-| New models | sha256 check of every file, then first load with **no network**, then a real tool-call test | `verify-model.sh`, `firstload*.{ps1,sh}`, `toolcheck.ps1` |
+| New models | sha256 check of every file, then first load with **no network**, then a real tool-call test | `modelcheck.py` (pytest-tested) called by `firstload-mac.sh` / after `firstload.ps1` |
 | Supply chain | Open WebUI pinned with a hash-locked `uv.lock`; container image pinned; model licenses and watermarking checked before adoption | setup guides |
 | Secrets | OS keychain only; gitleaks commit hook that fails closed | `.githooks/pre-commit` |
 | Everyday outbound (Mac) | Per-app firewall keeps Ollama offline except during approved downloads | one-line check in `docs/setup/MAC.md` |
@@ -48,6 +48,7 @@ Ollama, Open WebUI's raw port, SSH, RDP and SMB are blocked, and an edge check s
 | 6 | **Per-OS setup paths**; Mac models chosen for the Mac's hardware | Windows+NVIDIA and Apple silicon differ in GPU, model format and isolation tools | One generic guide; keeping both machines on identical models |
 | 7 | **Pinned, hash-locked dependencies** | Reproducible installs; a tampered package fails the hash | Floating versions |
 | 8 | **Private working repo + sanitized public copy** | Build freely with personal context; share a clean, reusable version | One repo with personal details; inviting people to the private repo |
+| 9 | **Machine inbox** (`ops/inbox.json`): one machine leaves checks for another; it runs them on `git pull` and commits the results | Work crosses machines with no inbound access (pull-based, like GitOps tools). Only an allowlist of `modelcheck.py` checks can run, arguments are validated and never pass through a shell (tests try injection); hooks are opt-in because git never runs a repo's hooks unless you set `core.hooksPath` | Self-hosted GitHub Actions runner (an always-on service; unsafe on public repos), SSH from the Mac (inbound access), asking a person to run it |
 
 ## Measured results (example hardware)
 | Machine | Model | Output speed | Notes |

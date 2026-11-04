@@ -32,7 +32,7 @@ mkdir -p ~/.ollama && printf '{ "disable_ollama_cloud": true }\n' > ~/.ollama/se
 open -a Ollama                                   # if it asks to sign in, choose "continue locally"
 gh repo clone seanhudgins/local-ai-starter ~/projects/local-ai && cd ~/projects/local-ai
 ollama pull gemma4:12b                           # 8 GB; with 32 GB+ memory try gemma4:26b-mlx
-bash services/ollama/verify-model.sh gemma4:12b && bash services/ollama/firstload-mac.sh gemma4:12b
+uv run services/ollama/modelcheck.py verify gemma4:12b && bash services/ollama/firstload-mac.sh gemma4:12b
 UV_PROJECT_ENVIRONMENT=~/ai/open-webui/venv uv sync --project services/open-webui --locked --python 3.12
 bash services/open-webui/start-mac.sh            # then open http://127.0.0.1:8080
 ```

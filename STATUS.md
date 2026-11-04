@@ -34,7 +34,7 @@ moves between devices: whatever machine you open next, it says where you left of
 ### Your Mac: local models (optional)
 - [ ] Ollama app: cloud off, localhost only (`check-mac.sh` passes)
 - [ ] Per-app firewall (e.g. LuLu) blocks Ollama except during approved downloads
-- [ ] Each model: `verify-model.sh` + `firstload-mac.sh` pass (incl. tool call)
+- [ ] Each model: `modelcheck.py verify` + `firstload-mac.sh` pass (incl. tool call)
 - [ ] Open WebUI on the Mac (`start-mac.sh`), admin created
 
 ### v1-1 Bake-off + skill guides [Your PC + Your Mac]

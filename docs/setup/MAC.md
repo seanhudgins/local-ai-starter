@@ -115,7 +115,7 @@ the size and capabilities, and say plainly what couldn't be verified:
 2. Pull: `ollama pull <tag>`
 3. **Verify the files**: every file must match the sha256 in its manifest.
    ```zsh
-   bash services/ollama/verify-model.sh <tag>
+   uv run services/ollama/modelcheck.py verify <tag>
    ```
 4. **Isolated first load** (see "Why a sandbox, not Docker" below):
    ```zsh

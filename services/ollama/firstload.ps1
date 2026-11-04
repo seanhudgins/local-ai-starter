@@ -5,7 +5,7 @@
 # Docker Desktop passes only NVIDIA GPUs into containers, so on AMD or Intel GPUs the container runs
 # on the CPU. That's fine: this is an isolation test, not a speed test. The GPU is checked on the host.
 # Pass = a sensible answer, and with an NVIDIA GPU `ollama ps` showing 100% GPU. Then run
-# toolcheck.ps1 on the host. Only then use the model.
+# `uv run services\ollama\modelcheck.py check <tag>` on the host. Only then use the model.
 
 param(
     [Parameter(Mandatory)] [string] $Model,

@@ -1,0 +1,29 @@
+[project]
+name = "local-ai"
+version = "0.1.0"
+description = "Local AI tooling: model checks now; eval runner, gateway launcher and MCP server in later steps."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["services/ollama"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["services/open-webui"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import order, modern syntax, likely bugs, simpler code
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# The sanitizer's rules are long regex/replacement pairs; one rule per line is easier to review.
+"publish/publish.py" = ["E501"]

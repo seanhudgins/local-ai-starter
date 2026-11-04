@@ -1,0 +1,5 @@
+{
+  "about": "Checks one machine leaves for another. Run with `uv run ops/run_inbox.py` (the post-merge hook does it after `git pull`). Only modelcheck.py checks are allowed; see ops/run_inbox.py.",
+  "example": {"id": "2026-01-01-pc-check-gemma4-12b", "machine": "<pc-hostname>", "check": "check", "model": "gemma4:12b", "why": "first check on the PC"},
+  "tasks": []
+}

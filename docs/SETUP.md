@@ -45,7 +45,8 @@ Each machine has its own setup path, because Windows and macOS differ in more th
 | Cloud off | User env var `OLLAMA_NO_CLOUD=1` | `~/.ollama/server.json` → `disable_ollama_cloud` |
 | Installer check | Script signature | App signed by Ollama + notarized by Apple (`check-mac.sh`) |
 | Settings check | `server.log` | `bash services/ollama/check-mac.sh` |
-| Model file check | `verify-model.sh` in WSL2 | `bash services/ollama/verify-model.sh <tag>` |
+| Model file check | `uv run services\ollama\modelcheck.py verify <tag> --models-dir D:\ai\ollama` | `uv run services/ollama/modelcheck.py verify <tag>` |
+| Model checks (answer, tool call, GPU) | `modelcheck.py check <tag>` on the host after the container load | Run by `firstload-mac.sh` inside its sandbox test |
 | **Isolated first load** | Docker `--network none` + GPU (`firstload.ps1`) | macOS sandbox, no network + GPU (`firstload-mac.sh`). Docker can't: no Apple GPU or MLX in its Linux VM |
 | Everyday outbound control | None yet | LuLu per-app firewall (recommended) |
 | Open WebUI | `start.ps1`; 127.0.0.1:8080, published to the tailnet on 443 | `start-mac.sh`; 127.0.0.1:8080, this Mac only, for the Mac's own models |
@@ -53,6 +54,14 @@ Each machine has its own setup path, because Windows and macOS differ in more th
 | Secrets | Windows Credential Manager | macOS Keychain (edge key only) |
 | gitleaks | `.githooks/pre-commit` (`git config core.hooksPath .githooks`) | Same |
 | Line endings | `.ps1` CRLF | `.sh`, `.sb` LF (`.gitattributes`) |
+
+## Leaving work for the other machine
+When a step has to run on a machine you're not at, leave it in `ops/inbox.json`: a task names the
+machine (its hostname), a check and a model tag. That machine runs it the next time it pulls
+(the `post-merge` hook, on once you've run `git config core.hooksPath .githooks` there) or when an agent
+starts a session there. Results land in `ops/results/<task-id>.txt`; commit them and they come back
+on your next pull. Only `modelcheck.py` checks can run, never arbitrary commands, because this runs
+automatically on `git pull`.
 
 ## Your rhythm
 1. On whatever device you're at: `git pull`, start your agent (e.g. `claude`) and paste **Start any session** from `prompts/PROMPTS.md`.

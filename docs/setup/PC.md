@@ -31,7 +31,7 @@ check before moving on.
 | **Other AMD Radeon; Intel Arc or Iris Xe** | Vulkan (on by default; most Windows drivers include it) | Latest AMD or Intel graphics driver | `firstload.ps1 -Model <tag> -NoGpu` |
 
 Docker Desktop passes only NVIDIA GPUs into containers, so on AMD and Intel the isolated first load
-runs on the CPU. It's an isolation test, not a speed test; `toolcheck.ps1` then shows GPU use on the
+runs on the CPU. It's an isolation test, not a speed test; the host check in §4 then shows GPU use on the
 host. Integrated GPUs (Iris Xe, Radeon in Ryzen chips) share system RAM: count that as their memory.
 
 ## 2. Tailscale (home node)
@@ -85,9 +85,9 @@ the size and capabilities, and say plainly what couldn't be verified:
 
 1. **You approve** the exact tag and size.
 2. Pull: `ollama pull <tag>`
-3. Verify the files (**WSL**, models on D:):
-   ```bash
-   bash services/ollama/verify-model.sh <tag> /mnt/d/ai/ollama
+3. Verify the files (every file must match the sha256 in its manifest):
+   ```powershell
+   uv run services\ollama\modelcheck.py verify <tag> --models-dir D:\ai\ollama
    ```
 4. **Isolated first load** in a `--network none` container, models mounted read-only (add `-NoGpu`
    for AMD or Intel GPUs, see §1):
@@ -95,12 +95,12 @@ the size and capabilities, and say plainly what couldn't be verified:
    pwsh -File services\ollama\firstload.ps1 -Model <tag>
    ```
    Pass = a sensible answer, and on NVIDIA `ollama ps` showing **100% GPU**.
-5. **Tool-call check** on the host (tools are required for chat models):
+5. **Model checks on the host**: synthetic prompt, tool call (required for chat models), and where
+   it runs (`--expect any` on AMD/Intel GPUs if Ollama splits the model):
    ```powershell
-   pwsh -File services\ollama\toolcheck.ps1 -Model <tag>
+   uv run services\ollama\modelcheck.py check <tag>
    ```
-   Pass = `PASS calls the tool with the right argument`. It also shows how much runs on the GPU.
-   Only then use the model.
+   Pass = `All checks passed.` Only then use the model.
 
 **Replacing an older version.** When a newer version arrives (e.g. `qwen3.6` → `qwen3.8`),
 decide whether to delete the old one, and confirm before deleting:

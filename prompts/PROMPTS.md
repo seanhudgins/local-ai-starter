@@ -46,7 +46,7 @@ and wait for my result before moving on.
 Read docs/setup/MAC.md and STATUS.md. Run `hostname` to confirm we're on the Mac.
 Then walk me through [the next unfinished step / adding the model <tag>] one step at a time.
 Ask before any model pull, and tell me its size first. Every new model gets
-verify-model.sh, then firstload-mac.sh, before I use it. After each step, give me
+`modelcheck.py verify`, then firstload-mac.sh, before I use it. After each step, give me
 the verify check and wait for my result.
 ```
 

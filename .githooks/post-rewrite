@@ -1,0 +1,4 @@
+#!/bin/sh
+# `git pull --rebase` triggers post-rewrite instead of post-merge; same inbox run.
+[ "$1" = "rebase" ] || exit 0
+exec "$(dirname "$0")/post-merge"
