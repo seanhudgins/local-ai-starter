@@ -65,7 +65,7 @@ Setup steps differ by OS: `docs/setup/PC.md` (your PC) and `docs/setup/MAC.md` (
 - Don't run in skip-permissions mode. Don't push to `main` directly; work on a branch and let the user merge.
 
 ## Conventions
-- Python via `uv`. FastAPI for services. Tests with `pytest`.
+- Python via `uv` for all logic (typed, `ruff`-clean, pytest-tested). Shell/PowerShell only as thin wrappers around OS tools. SQLite for anything queried later. FastAPI for services.
 - Never hard-code model names or prices; read them from config (`router/` files).
 - Every model/tool recommendation states expected VRAM use and whether it fits in 16 GB.
   Rule: model file + context (KV cache) + ~1.5 GB headroom < 16 GB. Start contexts at 8K–16K.

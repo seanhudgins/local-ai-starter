@@ -54,12 +54,17 @@ the verify check and wait for my result.
 ```
 Phase: v1-1 Bake-off + skill guides (docs/V1-SPEC.md).
 Goal: evidence-based primary and fast model per machine, and a skill guide for each.
+Step 0: move the model-check logic (tool-call test, answer check, sha256 verify, embedding check) into
+services/ollama/modelcheck.py with pytest tests, make the first-load scripts call it, and add ruff +
+pytest to CI.
 Step 1: draft 20–30 synthetic eval items as JSONL in evals/sets/ covering the 8 task types in V1-SPEC,
 each with an answer key. Fake names/DOBs/MRNs only. Show me 3 before writing the rest.
-Step 2: one eval runner (uv, pytest-tested): rule checks first (valid JSON, required fields,
-redaction regex), a grader model only for judgment items, and a tool-call reliability score.
+Step 2: one eval runner (Python, uv, pytest-tested, openai client against the OpenAI-compatible API,
+reusing modelcheck.py): rule checks first (valid JSON, required fields, redaction regex), a grader
+model only for judgment items, a tool-call reliability score; stamp the Ollama version and model
+digest on every result and store results in SQLite (evals/results.db).
 Step 3: run every installed model on this machine; tell me which machine to switch to for the rest.
-Write evals/scores.json, logs/benchmarks.md and a results table for the README.
+Write logs/benchmarks.md from SQL queries and a results table for the README.
 Step 4: for each chosen model, write skills/models/<model>/SKILL.md from the results only.
 ```
 
@@ -84,7 +89,7 @@ Build: (1) a JSON schema + validator for the Handoff Packet in docs/V1-SPEC.md; 
 exposing ask_local_model(task, input, output_schema) that calls an OpenAI-compatible endpoint URL
 from config (gateway on your PC, local Ollama on the Mac) and returns a response packet;
 (3) escalate_to_cloud through the gateway with the simple tier table, logging to
-logs/escalations.csv with no raw content; (4) skills/delegate-to-local/SKILL.md.
+SQLite (logs/escalations.db) with no raw content; (4) skills/delegate-to-local/SKILL.md.
 Rules: Python with uv; validate input and output; reject malformed packets; no secrets in code.
 Before coding, ask me questions. After, write tests and show me how to connect the server to Claude
 Code on my Mac.
@@ -93,7 +98,7 @@ Code on my Mac.
 ## v1-4 Demo + ops
 ```
 Phase: v1-4 Demo + ops.
-(1) An end-to-end flow I can record in 3 minutes: synthetic transcript → local redaction + summary →
+(1) An end-to-end flow I can record in 3 minutes, with a small UI (ask me: TypeScript web front end or Gradio): synthetic transcript → local redaction + summary →
 Claude QA scoring and coaching only on low-confidence cases. (2) A GPU benchmark report (tokens/sec,
 watts from nvidia-smi, $/task at my electricity rate) in outputs/benchmarks/. (3) Ops: Open WebUI and
 LiteLLM start at boot, a power policy for your PC, and a backup of Open WebUI data, evals and skills

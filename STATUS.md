@@ -38,9 +38,10 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] Open WebUI on the Mac (`start-mac.sh`), admin created
 
 ### v1-1 Bake-off + skill guides [Your PC + Your Mac]
+- [ ] Refactor checks into `services/ollama/modelcheck.py` (pytest); `ruff` + `pytest` in CI
 - [ ] Eval set (20–30 synthetic items, JSONL with answer keys) in `evals/sets/`
-- [ ] Eval runner: rule checks + grader, tool-call reliability, pytest-tested
-- [ ] Every installed model run on both machines; `evals/scores.json`, `logs/benchmarks.md`, README results table
+- [ ] Eval runner: rule checks + grader, tool-call reliability, Ollama version + digest stamped, results in SQLite, pytest-tested
+- [ ] Every installed model run on both machines; `evals/results.db`, `logs/benchmarks.md` (SQL), README results table
 - [ ] Primary + fast model chosen per machine
 - [ ] One `skills/models/<model>/SKILL.md` per chosen model
 
@@ -53,12 +54,12 @@ moves between devices: whatever machine you open next, it says where you left of
 ### v1-3 Handoff both ways
 - [ ] Handoff Packet schema + validator
 - [ ] `ask_local_model` MCP server (endpoint URL from config)
-- [ ] `escalate_to_cloud` + `logs/escalations.csv`
+- [ ] `escalate_to_cloud` + `logs/escalations.db` (SQLite)
 - [ ] `delegate-to-local` skill
 - [ ] Verified from Your Mac over Tailscale
 
 ### v1-4 Demo + ops [Your PC]
-- [ ] Recorded end-to-end demo; GPU benchmark report
+- [ ] Recorded end-to-end demo with a UI (TypeScript or Gradio); GPU benchmark report
 - [ ] Open WebUI + LiteLLM start at boot; PC power policy
 - [ ] Backup of Open WebUI data, evals, skills + restore test
 
