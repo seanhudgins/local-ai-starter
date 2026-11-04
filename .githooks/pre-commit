@@ -1,0 +1,7 @@
+#!/bin/sh
+# Blocks commits that contain secrets. Turn on once per clone: git config core.hooksPath .githooks
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "gitleaks not installed: commit blocked. Install it (see docs/GETTING-STARTED.md) or commit with --no-verify at your own risk." >&2
+    exit 1
+fi
+exec gitleaks git --pre-commit --staged --no-banner

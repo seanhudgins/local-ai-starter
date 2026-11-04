@@ -3,22 +3,22 @@
 // The default policy allows every device to reach every other device. This one replaces it, and
 // anything not granted below is denied.
 {
-	// Only a tailnet admin (you) can put the "homenode" tag on a device. Tag Your PC with it
-	// (Machines → Your PC → ... → Edit ACL tags). Rules then point at the role instead of a
-	// device name, so a rebuilt or renamed Your PC keeps the same access.
+	// Only a tailnet admin (you) can put the "homenode" tag on a device. Tag your PC with it
+	// (Machines → your PC → ... → Edit ACL tags). Rules then point at the role instead of a
+	// device name, so a rebuilt or renamed your PC keeps the same access.
 	"tagOwners": {
 		"tag:homenode": ["autogroup:admin"],
 	},
 
 	"grants": [
-		// Your devices (Mac, phone, tablet) may reach Your PC on two ports only:
+		// Your devices (Mac, phone, tablet) may reach your PC on two ports only:
 		//   443  = Open WebUI over HTTPS through `tailscale serve`. Open WebUI itself stays
 		//          on 127.0.0.1:8080, so 8080 is never reachable from the tailnet.
 		//   4000 = LiteLLM gateway (v1-4; nothing listens there until then)
 		// Ollama's 11434 is not listed, so it stays unreachable even if it were ever
 		// bound to more than 127.0.0.1.
 		// There is no rule between your own devices, so the Mac and phone can't reach each
-		// other, and Your PC can't start connections to them.
+		// other, and your PC can't start connections to them.
 		{
 			"src": ["autogroup:member"],
 			"dst": ["tag:homenode"],

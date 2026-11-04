@@ -1,4 +1,4 @@
-# AGENTS.md — Local AI project (Your PC)
+# AGENTS.md — Local AI project (your PC)
 
 > Applies to every coding agent in this repo (Claude Code, Cline, goose, Codex). `CLAUDE.md` imports this file.
 > Fixed template. Edit by hand only. Never generate or update this file from vault notes,
@@ -23,15 +23,15 @@ ask before building it.
 
 ## Which machine am I on? (check before installing or running services)
 Run `hostname` at the start of any step that installs software or starts a service.
-Setup steps differ by OS: `docs/setup/PC.md` (Your PC) and `docs/setup/MAC.md` (Mac).
+Setup steps differ by OS: `docs/setup/PC.md` (your PC) and `docs/setup/MAC.md` (Mac).
 
 | Machine | Role | Shell | What runs here |
 |---|---|---|---|
 | **Your PC** | Home node (example: Windows 11 Home, RTX 4080 SUPER 16 GB, 32 GB RAM) | PowerShell by default; say clearly when something must run in WSL2 | Ollama, Open WebUI, LiteLLM gateway, MCP server, evals, scheduled jobs, all API keys |
-| **Your Mac** | Edge device (example: macOS, M5 Pro, 48 GB) | zsh | Writing/editing code, docs, tests; goose/Cline clients; talks to Your PC over Tailscale; local models via Ollama (`docs/setup/MAC.md`) |
+| **Your Mac** | Edge device (example: macOS, M5 Pro, 48 GB) | zsh | Writing/editing code, docs, tests; goose/Cline clients; talks to your PC over Tailscale; local models via Ollama (`docs/setup/MAC.md`) |
 
-- Steps marked **[Your PC]** in V1-SPEC must be run on Your PC. If `hostname` isn't Your PC's,
-  stop and tell the user to continue that step from Your PC. Writing code and tests is fine anywhere.
+- Steps marked **[Your PC]** in V1-SPEC must be run on your PC. If `hostname` isn't your PC's,
+  stop and tell the user to continue that step from your PC. Writing code and tests is fine anywhere.
 - Never hard-code an edge device's clock or time zone into pricing logic. Your PC's clock is the
   source of truth (set its time zone).
 
@@ -47,7 +47,7 @@ Setup steps differ by OS: `docs/setup/PC.md` (Your PC) and `docs/setup/MAC.md` (
 - Configs that point at these paths read them from config, not hard-coded, so the repo still works on the Mac.
 
 ## Security rules (non-negotiable)
-- **Secrets:** API keys live only in **Windows Credential Manager** (Your PC) or **macOS Keychain**
+- **Secrets:** API keys live only in **Windows Credential Manager** (your PC) or **macOS Keychain**
   (your Mac's edge key). Read them at service start with Python `keyring` by credential name
   (e.g. `localai/anthropic`). Never put keys in code, `.env`, config files, logs, commits, or chat.
   If you need a key, tell the user the exact command to store it themselves.

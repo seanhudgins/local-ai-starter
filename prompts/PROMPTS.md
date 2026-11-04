@@ -28,11 +28,11 @@ read STATUS.md, and confirm what's next and whether this machine can do it.
 
 ---
 
-## v1-0 Secure base (run on Your PC)
+## v1-0 Secure base (run on your PC)
 ```
 Phase: v1-0 Secure base (see docs/V1-SPEC.md and the v1-0 checklist in STATUS.md).
 Goal: I can chat with a local model from my Mac and phone over Tailscale, and nothing else
-on Your PC is reachable.
+on your PC is reachable.
 Current state: [e.g. "Claude Code installed, nothing else yet"]
 Please walk me through it one checklist item at a time, in this order: driver check, WSL2, uv/Git,
 gitleaks, Tailscale (MFA, deny-by-default ACL, device approval) BEFORE Ollama or Open WebUI.
@@ -66,7 +66,7 @@ license, and tool-calling support, and wait for my OK before any model is pulled
 ```
 Phase: v1-2 Skill guides.
 Using evals/scores.json and logs/benchmarks.md, write skills/models/<model>/SKILL.md for
-[primary model] and [fast model], following the template in docs/plan (section 9b).
+[primary model] and [fast model], using one consistent template (strengths, failure modes, prompt format, escalation rules, one worked example).
 Every strength and weakness must cite eval results. Include one Handoff Packet that worked.
 ```
 
@@ -84,7 +84,7 @@ to Claude Code on my Mac over Tailscale.
 ## v1-4 Gateway + local → cloud
 ```
 Phase: v1-4 Gateway.
-Build: LiteLLM proxy on Your PC in front of Ollama + Anthropic, Google, and OpenRouter.
+Build: LiteLLM proxy on your PC in front of Ollama + Anthropic, Google, and OpenRouter.
 - Pin LiteLLM by version and hash.
 - A service launcher reads keys from Windows Credential Manager with keyring (names: localai/anthropic,
   localai/google, localai/openrouter) and passes them only to the LiteLLM process. Give me the
@@ -110,8 +110,8 @@ Make it something I can show in a 3-minute screen recording.
 Phase: v1-6 Automation.
 Build: (1) a once-per-day price refresh from LiteLLM's price map / OpenRouter's models API with a
 refreshed_on check; (2) a fixed peak-hours rule that schedules batch jobs out of your utility's peak window (e.g. weekdays 5–8 p.m.)
-using Your PC's clock; (3) Cline in VS Code pointed at the gateway; (4) restic encrypted backups
-to the HDD and an offsite bucket, plus a restore test. One item at a time, with verify checks.
+using your PC's clock; (3) Cline in VS Code pointed at the gateway; (4) restic encrypted backups
+to an external drive and an offsite bucket, plus a restore test. One item at a time, with verify checks.
 ```
 
 ---

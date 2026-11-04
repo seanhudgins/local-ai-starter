@@ -1,12 +1,12 @@
 # open-webui (v1-0, [Your PC]; Mac copy for the Mac's own models)
 
-**On the Mac:** `bash services/open-webui/start-mac.sh`, with paths in `config-mac.json`. Same pinned version and settings, localhost only, never shared over Tailscale. See `docs/setup/MAC.md` §7. The rest of this page is Your PC.
+**On the Mac:** `bash services/open-webui/start-mac.sh`, with paths in `config-mac.json`. Same pinned version and settings, localhost only, never shared over Tailscale. See `docs/setup/MAC.md` §7. The rest of this page is your PC.
 
 Browser chat for the local Ollama models. Pinned to Open WebUI 0.13.0 with a hash-locked `uv.lock`.
 
 | Setting | Value | Why |
 |---|---|---|
-| Bind | `127.0.0.1:8080` | Only Your PC can reach it until Tailscale is set up. `start.ps1` refuses any other host. |
+| Bind | `127.0.0.1:8080` | Only your PC can reach it until Tailscale is set up. `start.ps1` refuses any other host. |
 | Data | `D:\ai\open-webui\data` | Chats, database and secret key stay out of the repo. |
 | Program | `D:\ai\open-webui\venv` | The Python environment is several GB. |
 | Models | Ollama at `127.0.0.1:11434` only | OpenAI-style providers are off until the v1-4 gateway. |

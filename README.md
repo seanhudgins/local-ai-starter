@@ -6,21 +6,26 @@ hand work back and forth between local models and Claude. Built step by step wit
 and one Mac.
 
 **What you get (v1-0, secure base):**
-- **Your PC** (NVIDIA GPU) runs [Ollama](https://ollama.com) and [Open WebUI](https://openwebui.com),
+- **Your PC** (NVIDIA, AMD or Intel GPU) runs [Ollama](https://ollama.com) and [Open WebUI](https://openwebui.com),
   reachable from your other devices over [Tailscale](https://tailscale.com) and nothing else.
-- **Your Mac** (Apple silicon) can run its own models, with browser chat on the Mac only.
+- **Your Mac** (Apple silicon, or Intel for small models) can run its own models, with browser chat on the Mac only.
 - Every new model: sha256-checked, then first loaded with **no network** (Docker on the PC, a macOS
   sandbox on the Mac), and chat models must pass a real **tool-call test**.
 - Secrets never in files; gitleaks blocks commits that contain them.
+
+**Example use case:** the evals and prompts use contact-center work (call summaries, intent
+detection, PII redaction, QA scoring) with **synthetic** data. Swap in your own tasks.
 
 Later steps (model bake-off, Claude ↔ local handoff, LiteLLM gateway with spend caps) are in
 [`docs/V1-SPEC.md`](docs/V1-SPEC.md).
 
 ## Start
-1. Read [`docs/SETUP.md`](docs/SETUP.md), then follow [`docs/setup/PC.md`](docs/setup/PC.md) and/or
-   [`docs/setup/MAC.md`](docs/setup/MAC.md).
-2. Track progress in [`STATUS.md`](STATUS.md). Rules for your coding agent are in [`AGENTS.md`](AGENTS.md).
-3. With Claude Code, paste the prompts in [`prompts/PROMPTS.md`](prompts/PROMPTS.md) to go one step at a time.
+1. **New to this?** [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md): accounts, terminal basics,
+   folder layout, installing every tool (Docker, Tailscale, LuLu, …) and getting your own private copy.
+2. Then follow [`docs/setup/PC.md`](docs/setup/PC.md) and/or [`docs/setup/MAC.md`](docs/setup/MAC.md)
+   ([`docs/SETUP.md`](docs/SETUP.md) compares the two).
+3. Track progress in [`STATUS.md`](STATUS.md). Rules for your coding agent are in [`AGENTS.md`](AGENTS.md).
+4. With Claude Code, paste the prompts in [`prompts/PROMPTS.md`](prompts/PROMPTS.md) to go one step at a time.
 
 ## Make it yours
 | File | Change |

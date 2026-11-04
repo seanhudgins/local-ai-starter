@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # v1-0 edge check. Run on an edge device (Mac) with Tailscale connected:
 #   bash services/tailscale/check-edge.sh
-# Passes when Open WebUI answers over HTTPS and every other Your PC port is blocked.
+# Passes when Open WebUI answers over HTTPS and every other your PC port is blocked.
 
 set -u
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -16,10 +16,10 @@ fail() { echo "FAIL  $1"; fails=$((fails + 1)); }
 
 echo "Checking $host from $(hostname)"
 
-# 1. Open WebUI over tailnet HTTPS (tailscale serve -> 127.0.0.1:8080 on Your PC).
+# 1. Open WebUI over tailnet HTTPS (tailscale serve -> 127.0.0.1:8080 on your PC).
 code="$(curl -s -o /dev/null -w '%{http_code}' -m 15 "https://$host/health")"
 [ "$code" = "200" ] && pass "https://$host answers (HTTP 200, valid cert)" \
-                    || fail "https://$host returned '$code' (want 200). Is Open WebUI running on Your PC?"
+                    || fail "https://$host returned '$code' (want 200). Is Open WebUI running on your PC?"
 
 # 2. Everything else must be unreachable: Open WebUI's raw port, Ollama, SSH, RDP, SMB.
 # macOS nc: -G is the connect timeout (-w there is an idle timeout, so a blocked port would wait

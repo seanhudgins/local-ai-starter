@@ -67,7 +67,7 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] Daily price refresh (once/day)
 - [ ] Peak-hours rule for batch jobs
 - [ ] Cline → gateway
-- [ ] restic backups (HDD + offsite) + restore test
+- [ ] restic backups (external drive + offsite) + restore test
 
 ## Session log
 <!-- newest first: date · machine · what changed · verified? -->

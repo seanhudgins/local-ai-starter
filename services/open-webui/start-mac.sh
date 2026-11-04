@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start Open WebUI on the Mac, for the Mac's own Ollama. Mac version of start.ps1:
 #   bash services/open-webui/start-mac.sh
-# Same pinned version and hash-locked uv.lock as Your PC, same security settings. Localhost only:
+# Same pinned version and hash-locked uv.lock as your PC, same security settings. Localhost only:
 # nothing on the Mac is shared over Tailscale. Paths come from config-mac.json. Ctrl+C stops it.
 set -euo pipefail
 
@@ -13,7 +13,7 @@ expand() { local p="$1"; echo "${p/#\~/$HOME}"; }
 host="$(get host)"; port="$(get port)"; ollama_url="$(get ollamaUrl)"
 data_dir="$(expand "$(get dataDir)")"; venv_dir="$(expand "$(get venvDir)")"
 
-[ "$(uname)" = "Darwin" ] || { echo "Run this on the Mac. On Your PC use start.ps1."; exit 1; }
+[ "$(uname)" = "Darwin" ] || { echo "Run this on the Mac. On your PC use start.ps1."; exit 1; }
 if [ "$host" != "127.0.0.1" ]; then
     # The Mac's Open WebUI is for the Mac only (docs/setup/MAC.md).
     echo "config-mac.json host is '$host'. It must stay 127.0.0.1."; exit 1

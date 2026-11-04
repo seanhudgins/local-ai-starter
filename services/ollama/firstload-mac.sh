@@ -5,7 +5,8 @@
 #
 #   bash services/ollama/firstload-mac.sh <tag> [context]      e.g. qwen3.6:27b-mlx 8192
 #
-# Pass = every isolation check passes, a sensible answer, and `ollama ps` showing 100% GPU.
+# Pass = every isolation check passes, a sensible answer, `ollama ps` showing 100% GPU (Apple silicon;
+# Intel Macs run on the CPU), and a correct tool call.
 # Only then use the model in the normal Ollama app.
 
 set -u
@@ -18,6 +19,10 @@ models="$HOME/.ollama/models"
 port=11435                      # the normal Ollama app keeps 11434
 
 [ "$(uname)" = "Darwin" ] || { echo "FAIL  run this on the Mac"; exit 1; }
+arch="$(uname -m)"   # arm64 = Apple silicon (GPU via Metal, MLX); x86_64 = Intel Mac (expect CPU only)
+if [ "$arch" = "x86_64" ] && echo "$model" | grep -qi mlx; then
+    echo "FAIL  $model is an MLX model; MLX needs Apple silicon. Pick a non-mlx tag on an Intel Mac."; exit 1
+fi
 command -v sandbox-exec >/dev/null || { echo "FAIL  sandbox-exec not found"; exit 1; }
 ollama="$(command -v ollama || echo /Applications/Ollama.app/Contents/Resources/ollama)"
 [ -x "$ollama" ] || { echo "FAIL  ollama not installed"; exit 1; }
@@ -121,9 +126,14 @@ answer="$("$ollama" run "$model" --hidethinking --verbose "$prompt" 2>"$scratch/
 echo "answer: $answer"
 grep -E 'eval rate' "$scratch/stats" | sed -E $'s/\x1b\\[[0-9;?]*[a-zA-Z]//g'
 echo "$answer" | grep -qiw 'billing' && pass "answer is 'billing'" || fail "expected 'billing'"
-echo "--- ollama ps (want 100% GPU):"
+echo "--- ollama ps:"
 ps_out="$("$ollama" ps)"; echo "$ps_out"
-echo "$ps_out" | grep -q '100% GPU' && pass "100% GPU" || fail "not fully on the GPU"
+if [ "$arch" = "x86_64" ]; then
+    echo "$ps_out" | grep -qE '100% (CPU|GPU)' && pass "runs ($(echo "$ps_out" | grep -oE '100% (CPU|GPU)')); CPU is expected on an Intel Mac" \
+        || fail "split between CPU and GPU, or not loaded"
+else
+    echo "$ps_out" | grep -q '100% GPU' && pass "100% GPU" || fail "not fully on the GPU"
+fi
 
 # Tool use is a requirement on the Mac. The "tools" badge only means the model
 # accepts tool definitions, so check it actually calls a synthetic tool with the right argument.

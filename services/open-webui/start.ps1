@@ -1,4 +1,4 @@
-# Start Open WebUI on Your PC (v1-0). PowerShell 7: pwsh -File services\open-webui\start.ps1
+# Start Open WebUI on your PC (v1-0). PowerShell 7: pwsh -File services\open-webui\start.ps1
 # Paths come from config.json so nothing machine-specific is hard-coded here.
 # Security settings below follow docs/V1-SPEC.md; change them only on purpose.
 
