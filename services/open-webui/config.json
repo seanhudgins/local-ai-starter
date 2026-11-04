@@ -1,0 +1,7 @@
+{
+  "dataDir": "D:\\ai\\open-webui\\data",
+  "venvDir": "D:\\ai\\open-webui\\venv",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "ollamaUrl": "http://127.0.0.1:11434"
+}

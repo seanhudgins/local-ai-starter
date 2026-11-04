@@ -1,0 +1,40 @@
+;; macOS sandbox profile for the first load of a new model (Mac version of the no-network container).
+;; Used by firstload-mac.sh; see docs/setup/MAC.md. The kernel enforces these rules on the sandboxed
+;; Ollama server and every process it starts.
+;;
+;; Parameters (passed with -D by firstload-mac.sh):
+;;   MODELS    model store, read-only        (like the container's -v ...:/models:ro)
+;;   SCRATCH   throwaway HOME for this run   (deleted afterwards)
+;;   HOME_DIR  your home folder, hidden    (the container can't see it either)
+
+(version 1)
+(allow default)
+
+;; Network: nothing leaves the Mac. Loopback only, because the server talks to its runner
+;; subprocess and to the test client over 127.0.0.1. DNS is blocked too.
+(deny network*)
+(allow network-bind network-inbound (local ip "localhost:*"))
+(allow network-outbound (remote ip "localhost:*"))
+
+;; Files: no writes anywhere except the scratch folder and system temp/cache folders
+;; (Metal keeps its shader cache there).
+(deny file-write*)
+(allow file-write*
+    (subpath (param "SCRATCH"))
+    (subpath "/private/var/folders")
+    (subpath "/private/tmp")
+    (literal "/dev/null")
+    (subpath "/dev/fd")
+    (regex #"^/dev/tty"))
+
+;; No reading the home folder (documents, keys, repo), except the models and the scratch folder.
+(deny file-read* (subpath (param "HOME_DIR")))
+(allow file-read*
+    (subpath (param "MODELS"))
+    (subpath (param "SCRATCH")))
+
+;; Ollama checks each folder on the way to the models (lstat). Allow file info (exists,
+;; type, size) for those two folders only: not their contents, and nothing else in home.
+(allow file-read-metadata
+    (literal (param "HOME_DIR"))
+    (literal (param "MODELS_PARENT")))

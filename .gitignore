@@ -1,0 +1,42 @@
+# Secrets: never commit (keys live in Credential Manager / Keychain)
+.env
+.env.*
+*.key
+*.pem
+secrets/
+**/credentials*
+
+# Models and big data stay out of git
+models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Logs can contain task metadata; keep local
+logs/*.csv
+logs/**/raw/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+
+# Claude Code local-only settings
+.claude/settings.local.json
+
+# More secrets and build files
+service_account*.json
+id_rsa
+id_ed25519
+node_modules/
+
+# Open WebUI secret key (lives in D:\ai\open-webui\data; never in the repo)
+.webui_secret_key

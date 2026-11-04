@@ -1,0 +1,40 @@
+// Tailscale access policy for the local-ai tailnet (v1-0).
+// Paste into https://login.tailscale.com/admin/acls/file, replacing the default policy.
+// The default policy allows every device to reach every other device. This one replaces it, and
+// anything not granted below is denied.
+{
+	// Only a tailnet admin (you) can put the "homenode" tag on a device. Tag Your PC with it
+	// (Machines → Your PC → ... → Edit ACL tags). Rules then point at the role instead of a
+	// device name, so a rebuilt or renamed Your PC keeps the same access.
+	"tagOwners": {
+		"tag:homenode": ["autogroup:admin"],
+	},
+
+	"grants": [
+		// Your devices (Mac, phone, tablet) may reach Your PC on two ports only:
+		//   443  = Open WebUI over HTTPS through `tailscale serve`. Open WebUI itself stays
+		//          on 127.0.0.1:8080, so 8080 is never reachable from the tailnet.
+		//   4000 = LiteLLM gateway (v1-4; nothing listens there until then)
+		// Ollama's 11434 is not listed, so it stays unreachable even if it were ever
+		// bound to more than 127.0.0.1.
+		// There is no rule between your own devices, so the Mac and phone can't reach each
+		// other, and Your PC can't start connections to them.
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:homenode"],
+			"ip":  ["tcp:443", "tcp:4000"],
+		},
+	],
+
+	// No Tailscale SSH for now.
+	"ssh": [],
+
+	// Tailscale runs these checks when you save. A save that would break them is rejected.
+	"tests": [
+		{
+			"src":    "<you>@github",
+			"accept": ["tag:homenode:443", "tag:homenode:4000"],
+			"deny":   ["tag:homenode:8080", "tag:homenode:11434", "tag:homenode:22", "tag:homenode:3389", "tag:homenode:445"],
+		},
+	],
+}

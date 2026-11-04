@@ -1,0 +1,12 @@
+[project]
+name = "local-ai-open-webui"
+version = "0.1.0"
+description = "Pinned Open WebUI (v1-0). Started by start.ps1 (Your PC) or start-mac.sh (Mac), never directly."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Bump deliberately: read the release notes, back up D:\ai\open-webui\data, then `uv lock`.
+    "open-webui==0.13.0",
+]
+
+[tool.uv]
+package = false
