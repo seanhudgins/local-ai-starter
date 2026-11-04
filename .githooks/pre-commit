@@ -4,4 +4,17 @@ if ! command -v gitleaks >/dev/null 2>&1; then
     echo "gitleaks not installed: commit blocked. Install it (see docs/GETTING-STARTED.md) or commit with --no-verify at your own risk." >&2
     exit 1
 fi
-exec gitleaks git --pre-commit --staged --no-banner
+gitleaks git --pre-commit --staged --no-banner || exit 1
+
+# Private working repo only (publish/ is never copied out): block anything personal that would
+# leak into the public copy. Rules: publish/SANITIZE.md.
+if [ -f publish/publish.py ]; then
+    if command -v uv >/dev/null 2>&1; then
+        uv run --no-project --quiet python -I publish/publish.py --check || exit 1
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 -I publish/publish.py --check || exit 1
+    else
+        echo "Neither uv nor python3 found: can't run the personal-details scan. Commit blocked." >&2
+        exit 1
+    fi
+fi

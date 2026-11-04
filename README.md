@@ -1,5 +1,8 @@
 # local-ai starter
 
+[![checks](https://github.com/seanhudgins/local-ai-starter/actions/workflows/checks.yml/badge.svg)](https://github.com/seanhudgins/local-ai-starter/actions/workflows/checks.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Run open-weight AI models on your own hardware, reach them privately from your other devices, and
 hand work back and forth between local models and Claude. Built step by step with a coding agent
 (Claude Code), with security checks at every step. Written for beginners; tested on one Windows PC
@@ -18,6 +21,8 @@ detection, PII redaction, QA scoring) with **synthetic** data. Swap in your own 
 
 Later steps (model bake-off, Claude ↔ local handoff, LiteLLM gateway with spend caps) are in
 [`docs/V1-SPEC.md`](docs/V1-SPEC.md).
+
+**How it's built and why:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (diagram, security layers, design decisions, measured speeds).
 
 ## Start
 1. **New to this?** [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md): accounts, terminal basics,
