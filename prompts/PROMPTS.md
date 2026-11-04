@@ -50,68 +50,54 @@ verify-model.sh, then firstload-mac.sh, before I use it. After each step, give m
 the verify check and wait for my result.
 ```
 
-## v1-1 Model bake-off
+## v1-1 Bake-off + skill guides
 ```
-Phase: v1-1 Bake-off.
-Goal: evidence-based pick of a primary (~12–14B) and fast (~3–8B) local model for contact-center tasks.
-Step 1: draft 20–30 synthetic eval items in evals/sets/ covering the 8 task types in V1-SPEC,
-each with an answer key. Use fake names/DOBs/MRNs that clearly aren't real. Show me 3 before writing the rest.
-Step 2: write one eval script (uv, pytest-tested) that runs rule checks first (valid JSON, required
-fields, redaction regex) and calls a grader model only for judgment items.
-Step 3: search for current open-weight candidates that fit 16 GB VRAM, list 3–5 with expected VRAM,
-license, and tool-calling support, and wait for my OK before any model is pulled.
-```
-
-## v1-2 Model skill guides
-```
-Phase: v1-2 Skill guides.
-Using evals/scores.json and logs/benchmarks.md, write skills/models/<model>/SKILL.md for
-[primary model] and [fast model], using one consistent template (strengths, failure modes, prompt format, escalation rules, one worked example).
-Every strength and weakness must cite eval results. Include one Handoff Packet that worked.
+Phase: v1-1 Bake-off + skill guides (docs/V1-SPEC.md).
+Goal: evidence-based primary and fast model per machine, and a skill guide for each.
+Step 1: draft 20–30 synthetic eval items as JSONL in evals/sets/ covering the 8 task types in V1-SPEC,
+each with an answer key. Fake names/DOBs/MRNs only. Show me 3 before writing the rest.
+Step 2: one eval runner (uv, pytest-tested): rule checks first (valid JSON, required fields,
+redaction regex), a grader model only for judgment items, and a tool-call reliability score.
+Step 3: run every installed model on this machine; tell me which machine to switch to for the rest.
+Write evals/scores.json, logs/benchmarks.md and a results table for the README.
+Step 4: for each chosen model, write skills/models/<model>/SKILL.md from the results only.
 ```
 
-## v1-3 Claude → local (MCP)
+## v1-2 Gateway
 ```
-Phase: v1-3 Claude → local.
-Build: (1) a JSON schema + validator for the Handoff Packet in docs/V1-SPEC.md;
-(2) a small MCP server exposing ask_local_model(task, input, output_schema) that calls the local
-model and returns a response packet; (3) skills/delegate-to-local/SKILL.md saying when to delegate.
+Phase: v1-2 Gateway.
+Build: LiteLLM in Docker (image pinned by digest) on your PC, in front of Ollama + Anthropic,
+Google and OpenRouter.
+- A launcher reads keys from Windows Credential Manager with keyring (names: localai/anthropic,
+  localai/google, localai/openrouter) and passes them only to the container. Give me the commands to
+  store each key myself; never ask me to paste a key into chat.
+- Virtual keys with budgets for: open-webui, goose, cline, mcp-local. Aliases `auto`, `auto-coding`.
+- Per-call, daily, monthly caps.
+Before coding, ask me what caps I want. After, point Open WebUI, goose and Cline at the gateway and
+show me a test that proves a call over the cap is refused.
+```
+
+## v1-3 Handoff both ways
+```
+Phase: v1-3 Handoff both ways.
+Build: (1) a JSON schema + validator for the Handoff Packet in docs/V1-SPEC.md; (2) an MCP server
+exposing ask_local_model(task, input, output_schema) that calls an OpenAI-compatible endpoint URL
+from config (gateway on your PC, local Ollama on the Mac) and returns a response packet;
+(3) escalate_to_cloud through the gateway with the simple tier table, logging to
+logs/escalations.csv with no raw content; (4) skills/delegate-to-local/SKILL.md.
 Rules: Python with uv; validate input and output; reject malformed packets; no secrets in code.
-Before coding, ask me questions. After coding, write tests and show me how to connect the server
-to Claude Code on my Mac over Tailscale.
+Before coding, ask me questions. After, write tests and show me how to connect the server to Claude
+Code on my Mac.
 ```
 
-## v1-4 Gateway + local → cloud
+## v1-4 Demo + ops
 ```
-Phase: v1-4 Gateway.
-Build: LiteLLM proxy on your PC in front of Ollama + Anthropic, Google, and OpenRouter.
-- Pin LiteLLM by version and hash.
-- A service launcher reads keys from Windows Credential Manager with keyring (names: localai/anthropic,
-  localai/google, localai/openrouter) and passes them only to the LiteLLM process. Give me the
-  commands to store each key myself; never ask me to paste a key into chat.
-- Virtual keys with budgets for: open-webui, goose, cline, mcp-local.
-- Routing aliases `auto` and `auto-coding`; a simple tier table for escalate_to_cloud.
-- Per-call, daily, monthly caps; log escalations to logs/escalations.csv with no raw content.
-Before coding, ask me what caps I want. After, show me how to point Open WebUI and goose at the gateway,
-and a test that proves a call over the cap is refused.
-```
-
-## v1-5 Demo + benchmark
-```
-Phase: v1-5 Demo.
-Build an end-to-end flow: synthetic transcript → local redaction + summary → Claude QA scoring
-and coaching only on cases the local model marks low-confidence. Then a GPU benchmark report
-(tokens/sec, watts from nvidia-smi, $/task at your electricity rates) in outputs/benchmarks/.
-Make it something I can show in a 3-minute screen recording.
-```
-
-## v1-6 Simple automation
-```
-Phase: v1-6 Automation.
-Build: (1) a once-per-day price refresh from LiteLLM's price map / OpenRouter's models API with a
-refreshed_on check; (2) a fixed peak-hours rule that schedules batch jobs out of your utility's peak window (e.g. weekdays 5–8 p.m.)
-using your PC's clock; (3) Cline in VS Code pointed at the gateway; (4) restic encrypted backups
-to an external drive and an offsite bucket, plus a restore test. One item at a time, with verify checks.
+Phase: v1-4 Demo + ops.
+(1) An end-to-end flow I can record in 3 minutes: synthetic transcript → local redaction + summary →
+Claude QA scoring and coaching only on low-confidence cases. (2) A GPU benchmark report (tokens/sec,
+watts from nvidia-smi, $/task at my electricity rate) in outputs/benchmarks/. (3) Ops: Open WebUI and
+LiteLLM start at boot, a power policy for your PC, and a backup of Open WebUI data, evals and skills
+with a restore test. One item at a time, with verify checks.
 ```
 
 ---

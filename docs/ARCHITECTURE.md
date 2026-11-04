@@ -59,6 +59,7 @@ Ollama, Open WebUI's raw port, SSH, RDP and SMB are blocked, and an edge check s
 | Mac, M5 Pro 48 GB | `qwen3.6:27b-mlx` | ~40 tok/s | Strongest, dense model |
 
 ## Roadmap
-v1-1 model bake-off with a synthetic eval set → v1-2 per-model skill guides → v1-3 Claude → local
-handoff (MCP) → v1-4 LiteLLM gateway with spend caps and escalation to cloud → v1-5 end-to-end demo and
-GPU benchmark → v1-6 automation and backups. Details: [`V1-SPEC.md`](V1-SPEC.md).
+v1-1 bake-off on both machines + a skill guide per chosen model → v1-2 LiteLLM gateway (one entry
+point, keys, budgets, caps) → v1-3 handoff both ways (Claude → local via MCP, local → cloud via the
+gateway) → v1-4 recorded demo, benchmark report, services at boot, backup + restore test.
+Each version ships a demo and a tagged release. Details: [`V1-SPEC.md`](V1-SPEC.md).

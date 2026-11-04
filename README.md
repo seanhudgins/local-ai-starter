@@ -24,6 +24,21 @@ Later steps (model bake-off, Claude ↔ local handoff, LiteLLM gateway with spen
 
 **How it's built and why:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (diagram, security layers, design decisions, measured speeds).
 
+## Try it on a Mac in 15 minutes
+Apple silicon Mac with 16 GB+ memory; no PC needed. Downloads about 10 GB.
+```zsh
+brew install --cask ollama-app && brew install git gh uv gitleaks
+mkdir -p ~/.ollama && printf '{ "disable_ollama_cloud": true }\n' > ~/.ollama/server.json
+open -a Ollama                                   # if it asks to sign in, choose "continue locally"
+gh repo clone seanhudgins/local-ai-starter ~/projects/local-ai && cd ~/projects/local-ai
+ollama pull gemma4:12b                           # 8 GB; with 32 GB+ memory try gemma4:26b-mlx
+bash services/ollama/verify-model.sh gemma4:12b && bash services/ollama/firstload-mac.sh gemma4:12b
+UV_PROJECT_ENVIRONMENT=~/ai/open-webui/venv uv sync --project services/open-webui --locked --python 3.12
+bash services/open-webui/start-mac.sh            # then open http://127.0.0.1:8080
+```
+That gives you a private chat UI on your own Mac, with the model checked and first-loaded offline.
+For the full setup (your own private copy, a PC with a GPU, access from your phone), continue below.
+
 ## Start
 1. **New to this?** [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md): accounts, terminal basics,
    folder layout, installing every tool (Docker, Tailscale, LuLu, …) and getting your own private copy.

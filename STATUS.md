@@ -37,37 +37,30 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] Each model: `verify-model.sh` + `firstload-mac.sh` pass (incl. tool call)
 - [ ] Open WebUI on the Mac (`start-mac.sh`), admin created
 
-### v1-1 Bake-off
-- [ ] Eval set (20–30 synthetic items) in `evals/sets/`
-- [ ] Eval script with rule checks + grader
-- [ ] 3–5 candidates tested; results in `evals/scores.json`, `logs/benchmarks.md`
-- [ ] Primary + fast models chosen
-
-### v1-2 Model skill guides
+### v1-1 Bake-off + skill guides [Your PC + Your Mac]
+- [ ] Eval set (20–30 synthetic items, JSONL with answer keys) in `evals/sets/`
+- [ ] Eval runner: rule checks + grader, tool-call reliability, pytest-tested
+- [ ] Every installed model run on both machines; `evals/scores.json`, `logs/benchmarks.md`, README results table
+- [ ] Primary + fast model chosen per machine
 - [ ] One `skills/models/<model>/SKILL.md` per chosen model
 
-### v1-3 Claude → local
+### v1-2 Gateway [Your PC]
+- [ ] Keys stored in Credential Manager (you do this yourself)
+- [ ] LiteLLM in Docker, pinned by digest; launcher passes keys via keyring
+- [ ] Virtual keys + budgets per client; aliases; caps; provider-side limits set
+- [ ] Open WebUI, goose, Cline → gateway; a call over the cap is refused
+
+### v1-3 Handoff both ways
 - [ ] Handoff Packet schema + validator
-- [ ] `ask_local_model` MCP server
+- [ ] `ask_local_model` MCP server (endpoint URL from config)
+- [ ] `escalate_to_cloud` + `logs/escalations.csv`
 - [ ] `delegate-to-local` skill
 - [ ] Verified from Your Mac over Tailscale
 
-### v1-4 Gateway + local → cloud
-- [ ] Keys stored in Credential Manager (you do this yourself)
-- [ ] LiteLLM pinned; launcher reads keys via keyring
-- [ ] Virtual keys + budgets per client; routing aliases
-- [ ] `escalate_to_cloud` + caps + `logs/escalations.csv`
-- [ ] Provider-side spend limits set
-
-### v1-5 Demo + benchmark
-- [ ] End-to-end contact-center demo
-- [ ] GPU benchmark report
-
-### v1-6 Simple automation
-- [ ] Daily price refresh (once/day)
-- [ ] Peak-hours rule for batch jobs
-- [ ] Cline → gateway
-- [ ] restic backups (external drive + offsite) + restore test
+### v1-4 Demo + ops [Your PC]
+- [ ] Recorded end-to-end demo; GPU benchmark report
+- [ ] Open WebUI + LiteLLM start at boot; PC power policy
+- [ ] Backup of Open WebUI data, evals, skills + restore test
 
 ## Session log
 <!-- newest first: date · machine · what changed · verified? -->
