@@ -49,6 +49,9 @@ Ollama, Open WebUI's raw port, SSH, RDP and SMB are blocked, and an edge check s
 | 7 | **Pinned, hash-locked dependencies** | Reproducible installs; a tampered package fails the hash | Floating versions |
 | 8 | **Private working repo + sanitized public copy** | Build freely with personal context; share a clean, reusable version | One repo with personal details; inviting people to the private repo |
 | 9 | **Machine inbox** (`ops/inbox.json`): one machine leaves checks for another; it runs them on `git pull` and commits the results | Work crosses machines with no inbound access (pull-based, like GitOps tools). Only an allowlist of `modelcheck.py` checks can run, arguments are validated and never pass through a shell (tests try injection); hooks are opt-in because git never runs a repo's hooks unless you set `core.hooksPath` | Self-hosted GitHub Actions runner (an always-on service; unsafe on public repos), SSH from the Mac (inbound access), asking a person to run it |
+| 10 | **OpenRouter as the middle tier** (local → big open model → Claude), also used for an eval ceiling row, try-before-download and a second judge | Measures what running locally costs in quality; cheaper escalations than going straight to Claude; evidence before an 18 GB download. Privacy enforced in the gateway: synthetic/redacted data only, no data collection, zero retention, provider pinned for evals | Straight local → Claude (no middle price point), downloading every candidate to test it, a direct key per open-model vendor |
+| 11 | **One retrieval store behind MCP** (the "Open Brain" pattern), self-hosted: SQLite + local embeddings on the home PC, `search_kb` on the MCP server | Every tier (local, OpenRouter, Claude) answers from the same knowledge, so the business case compares models, not data. Local keeps it private; our own code keeps the public copy MIT. Read-only and synthetic in v1; agent-written personal memory is Later | Hosted Postgres/pgvector (data leaves the house), a separate store per tool, reusing a source-available memory repo |
+| 12 | **Our own router, not a commercial auto-router** (Abacus.AI RouteLLM considered) | Routing rules we can explain, test and tune from eval data; privacy settings we control in the gateway. RouteLLM may appear only as an optional comparison column in the v1-4 business case | Adopting RouteLLM or a multi-model subscription as the router (black-box choices, credit pricing, overlaps LiteLLM + OpenRouter + Claude Code) |
 
 ## Measured results (example hardware)
 | Machine | Model | Output speed | Notes |
@@ -61,6 +64,6 @@ Ollama, Open WebUI's raw port, SSH, RDP and SMB are blocked, and an edge check s
 
 ## Roadmap
 v1-1 bake-off on both machines + a skill guide per chosen model → v1-2 LiteLLM gateway (one entry
-point, keys, budgets, caps) → v1-3 handoff both ways (Claude → local via MCP, local → cloud via the
-gateway) → v1-4 recorded demo, benchmark report, services at boot, backup + restore test.
+point, keys, budgets, caps; an OpenRouter ceiling run of the eval set) → v1-3 handoff both ways (Claude → local via MCP, local → cloud via the
+gateway, three tiers: local → OpenRouter → Claude) plus retrieval over a synthetic policy knowledge base → v1-4 recorded demo, local / open-model / Claude business case, benchmark report, services at boot, backup + restore test.
 Each version ships a demo and a tagged release. Details: [`V1-SPEC.md`](V1-SPEC.md).

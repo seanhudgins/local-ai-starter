@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import socket
 import subprocess
@@ -31,12 +32,14 @@ ROOT = Path(__file__).resolve().parent.parent
 INBOX = ROOT / "ops" / "inbox.json"
 RESULTS = ROOT / "ops" / "results"
 MODELCHECK = ROOT / "services" / "ollama" / "modelcheck.py"
+EVAL_RUN = ROOT / "evals" / "run.py"
 
-ALLOWED = {"verify", "check", "tools", "answer", "embed"}  # modelcheck.py subcommands
+ALLOWED = {"verify", "check", "tools", "answer", "embed", "eval"}  # modelcheck.py subcommands + the eval run
 TAG = re.compile(r"^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)?(:[a-z0-9][a-z0-9._-]*)?$")
 TASK_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
 EXPECT = {"gpu", "cpu", "any"}
 TIMEOUT = 20 * 60  # seconds; a cold load from a SATA drive can take a minute or two
+EVAL_TIMEOUT = 3 * 60 * 60  # a full eval run on one model (27 items, each capped at 5 minutes)
 
 
 def this_machine() -> str:
@@ -47,7 +50,7 @@ def load(inbox: Path | None = None) -> list[dict]:
     inbox = inbox or INBOX  # looked up at call time, so tests and callers can point elsewhere
     if not inbox.is_file():
         return []
-    return json.loads(inbox.read_text()).get("tasks", [])
+    return json.loads(inbox.read_text(encoding="utf-8")).get("tasks", [])
 
 
 def command(task: dict) -> list[str]:
@@ -59,6 +62,12 @@ def command(task: dict) -> list[str]:
         raise ValueError(f"check {check!r} isn't allowed (allowed: {', '.join(sorted(ALLOWED))})")
     if not TAG.match(model):
         raise ValueError(f"bad model tag {model!r}")
+    if check == "eval":
+        if "expect" in task:
+            raise ValueError("expect isn't allowed on eval tasks")
+        # Answers and rule-check results come back through git as ops/results/<id>.results.jsonl
+        out = (task.get("_results_dir") or RESULTS) / f"{tid}.results.jsonl"
+        return [sys.executable, str(EVAL_RUN), "run", "--models", model, "--note", f"inbox {tid}", "--out", str(out)]
     cmd = [sys.executable, str(MODELCHECK), check, model]
     if "expect" in task:
         if check != "check" or task["expect"] not in EXPECT:
@@ -81,18 +90,23 @@ def run(task: dict, machine: str, results: Path | None = None) -> int:
     results.mkdir(parents=True, exist_ok=True)
     try:
         cmd = command(task)
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT, check=False)
+        limit = EVAL_TIMEOUT if task.get("check") == "eval" else TIMEOUT
+        # The child prints UTF-8 and we decode it as UTF-8 (Windows defaults to cp1252 for both).
+        env = {**os.environ, "PYTHONUTF8": "1"}
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=limit, check=False
+        )
         code, output = proc.returncode, proc.stdout + proc.stderr
-        shown = " ".join(["modelcheck.py", *cmd[2:]])
+        shown = " ".join([Path(cmd[1]).name, *cmd[2:]])
     except ValueError as e:
         code, output, shown = 2, f"REFUSED  {e}\n", "(not run)"
     except subprocess.TimeoutExpired:
-        code, output, shown = 3, f"TIMEOUT  after {TIMEOUT}s\n", " ".join(["modelcheck.py", *cmd[2:]])
+        code, output, shown = 3, f"TIMEOUT  after {limit}s\n", " ".join([Path(cmd[1]).name, *cmd[2:]])
     header = (
         f"task: {task.get('id')}\nmachine: {machine}\nwhen: {datetime.now().isoformat(timespec='seconds')}\n"
         f"why: {task.get('why', '')}\ncommand: {shown}\nexit: {code}\n\n"
     )
-    (results / f"{task.get('id')}.txt").write_text(header + output)
+    (results / f"{task.get('id')}.txt").write_text(header + output, encoding="utf-8")
     return code
 
 

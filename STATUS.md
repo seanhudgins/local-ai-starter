@@ -44,6 +44,7 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] Every installed model run on both machines; `evals/results.db`, `logs/benchmarks.md` (SQL), README results table
 - [ ] Primary + fast model chosen per machine
 - [ ] One `skills/models/<model>/SKILL.md` per chosen model
+- [ ] `docs/releases/v1-1.md` case study + tagged public release
 
 ### v1-2 Gateway [Your PC]
 - [ ] Keys stored in Credential Manager (you do this yourself)
@@ -51,8 +52,9 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] Virtual keys + budgets per client; aliases; caps; provider-side limits set
 - [ ] Open WebUI, goose, Cline → gateway; a call over the cap is refused
 
-### v1-3 Handoff both ways
+### v1-3 Handoff both ways + retrieval
 - [ ] Handoff Packet schema + validator
+- [ ] Synthetic policy KB indexed with embeddinggemma-2 (SQLite); `search_kb` tool; grounded-answer evals with citations
 - [ ] `ask_local_model` MCP server (endpoint URL from config)
 - [ ] `escalate_to_cloud` + `logs/escalations.db` (SQLite)
 - [ ] `delegate-to-local` skill
@@ -60,6 +62,7 @@ moves between devices: whatever machine you open next, it says where you left of
 
 ### v1-4 Demo + ops [Your PC]
 - [ ] Recorded end-to-end demo with a UI (TypeScript or Gradio); GPU benchmark report
+- [ ] Business case: local vs Claude on the same tasks (accuracy, latency, $/task)
 - [ ] Open WebUI + LiteLLM start at boot; PC power policy
 - [ ] Backup of Open WebUI data, evals, skills + restore test
 

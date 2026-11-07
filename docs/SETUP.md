@@ -60,8 +60,9 @@ When a step has to run on a machine you're not at, leave it in `ops/inbox.json`:
 machine (its hostname), a check and a model tag. That machine runs it the next time it pulls
 (the `post-merge` hook, on once you've run `git config core.hooksPath .githooks` there) or when an agent
 starts a session there. Results land in `ops/results/<task-id>.txt`; commit them and they come back
-on your next pull. Only `modelcheck.py` checks can run, never arbitrary commands, because this runs
-automatically on `git pull`.
+on your next pull. Only `modelcheck.py` checks and the eval runner (`check: "eval"`, results in
+`ops/results/<task-id>.results.jsonl`, loaded on the other machine with `evals/run.py load`) can run,
+never arbitrary commands, because this runs automatically on `git pull`.
 
 ## Your rhythm
 1. On whatever device you're at: `git pull`, start your agent (e.g. `claude`) and paste **Start any session** from `prompts/PROMPTS.md`.

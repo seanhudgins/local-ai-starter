@@ -40,3 +40,7 @@ node_modules/
 
 # Open WebUI secret key (lives in D:\ai\open-webui\data; never in the repo)
 .webui_secret_key
+
+# Eval test runs: local only (the official run is exported to logs/ and committed)
+evals/results.db
+evals/judging/

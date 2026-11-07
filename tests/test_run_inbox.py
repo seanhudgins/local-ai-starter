@@ -133,3 +133,20 @@ def test_main_uses_the_current_inbox_and_results_paths(monkeypatch, tmp_path):
     assert ri.main([]) == 0
     assert (tmp_path / "results" / "t1.txt").exists()
     assert ri.main([]) == 0  # second run: already done, nothing runs
+
+
+# ---------- eval tasks ----------
+
+
+def test_eval_task_maps_to_the_eval_runner_only(tmp_path):
+    task = {**TASK, "check": "eval", "model": "gpt-oss:20b", "_results_dir": tmp_path}
+    cmd = ri.command(task)
+    assert cmd[0] == sys.executable and cmd[1].endswith(str(Path("evals") / "run.py"))
+    assert cmd[2:6] == ["run", "--models", "gpt-oss:20b", "--note"]
+    assert cmd[-2] == "--out" and cmd[-1] == str(tmp_path / "t1.results.jsonl")
+
+
+@pytest.mark.parametrize("bad", [{"model": "gpt-oss:20b --items x; rm -rf ~"}, {"expect": "gpu"}, {"id": "../x"}])
+def test_eval_task_rejects_tricks(bad):
+    with pytest.raises(ValueError):
+        ri.command({**TASK, "check": "eval", **bad})

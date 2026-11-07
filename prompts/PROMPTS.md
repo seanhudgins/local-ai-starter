@@ -76,20 +76,30 @@ Google and OpenRouter.
 - A launcher reads keys from Windows Credential Manager with keyring (names: localai/anthropic,
   localai/google, localai/openrouter) and passes them only to the container. Give me the commands to
   store each key myself; never ask me to paste a key into chat.
-- Virtual keys with budgets for: open-webui, goose, cline, mcp-local. Aliases `auto`, `auto-coding`.
+- Virtual keys with budgets for: open-webui, goose, cline, mcp-local, evals. Aliases `auto`, `auto-coding`.
 - Per-call, daily, monthly caps.
-Before coding, ask me what caps I want. After, point Open WebUI, goose and Cline at the gateway and
-show me a test that proves a call over the cap is refused.
+- OpenRouter routes per docs/V1-SPEC.md §Cloud tiers and OpenRouter: no data collection, zero
+  retention, no :free models, require_parameters, prepaid credit with a per-key limit. Check
+  OpenRouter's current docs first; settings and fees change.
+- Prices from router/ config and LiteLLM's price map, same as every provider; include OpenRouter's
+  credit fee in $/task.
+Before coding, ask me what caps I want. After, point Open WebUI, goose, Cline and the eval runner at
+the gateway, show me a test that proves a call over the cap is refused and one that proves an
+OpenRouter request without the privacy settings is refused. Then a ceiling run: the v1-1 eval set on
+1-2 big open models via OpenRouter (provider pinned, provider recorded per result, cost measured on a
+small batch first).
 ```
 
-## v1-3 Handoff both ways
+## v1-3 Handoff both ways + retrieval
 ```
-Phase: v1-3 Handoff both ways.
+Phase: v1-3 Handoff both ways + retrieval.
 Build: (1) a JSON schema + validator for the Handoff Packet in docs/V1-SPEC.md; (2) an MCP server
 exposing ask_local_model(task, input, output_schema) that calls an OpenAI-compatible endpoint URL
 from config (gateway on your PC, local Ollama on the Mac) and returns a response packet;
-(3) escalate_to_cloud through the gateway with the simple tier table, logging to
-SQLite (logs/escalations.db) with no raw content; (4) skills/delegate-to-local/SKILL.md.
+(3) escalate_to_cloud through the gateway with the three-tier table in V1-SPEC (local → big open
+model via OpenRouter → Claude, picked by the complexity score; tier models from router/ config), logging to
+SQLite (logs/escalations.db) with no raw content; (4) skills/delegate-to-local/SKILL.md; (5) RAG: a small synthetic policy knowledge base indexed
+with embeddinggemma-2 into SQLite, a search_kb tool, and eval items for grounded answers with citations.
 Rules: Python with uv; validate input and output; reject malformed packets; no secrets in code.
 Before coding, ask me questions. After, write tests and show me how to connect the server to Claude
 Code on my Mac.
@@ -102,7 +112,9 @@ Phase: v1-4 Demo + ops.
 Claude QA scoring and coaching only on low-confidence cases. (2) A GPU benchmark report (tokens/sec,
 watts from nvidia-smi, $/task at my electricity rate) in outputs/benchmarks/. (3) Ops: Open WebUI and
 LiteLLM start at boot, a power policy for your PC, and a backup of Open WebUI data, evals and skills
-with a restore test. One item at a time, with verify checks.
+with a restore test. (4) A business case: the same tasks in three columns, local / big open model
+via OpenRouter / Claude, with accuracy, latency and $/task side by side (prices from router/ config,
+OpenRouter's credit fee included), and where each tier line pays off. One item at a time, with verify checks.
 ```
 
 ---

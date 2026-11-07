@@ -224,7 +224,7 @@ def verify(tag: str, root: Path | None = None) -> list[Result]:
     manifest = manifest_path(root, tag)
     if not manifest.is_file():
         return [Result(False, f"no manifest at {manifest}")]
-    data = json.loads(manifest.read_text())
+    data = json.loads(manifest.read_text(encoding="utf-8"))
     digests = sorted({d["digest"] for d in [data.get("config", {}), *data.get("layers", [])] if d.get("digest")})
     bad = [
         d
