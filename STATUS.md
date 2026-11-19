@@ -43,7 +43,8 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] Eval runner: rule checks + grader, tool-call reliability, Ollama version + digest stamped, results in SQLite, pytest-tested
 - [ ] Every installed model run on both machines; `evals/results.db`, `logs/benchmarks.md` (SQL), README results table
 - [ ] Primary + fast model chosen per machine
-- [ ] One `skills/models/<model>/SKILL.md` per chosen model
+- [ ] Base skill per task type + per-model additions earned on held-out items
+- [ ] Capability views (SQL) over the eval results
 - [ ] `docs/releases/v1-1.md` case study + tagged public release
 
 ### v1-2 Gateway [Your PC]
@@ -51,12 +52,19 @@ moves between devices: whatever machine you open next, it says where you left of
 - [ ] LiteLLM in Docker, pinned by digest; launcher passes keys via keyring
 - [ ] Virtual keys + budgets per client; aliases; caps; provider-side limits set
 - [ ] Open WebUI, goose, Cline → gateway; a call over the cap is refused
+- [ ] OpenTelemetry traces → Langfuse + a local SQLite copy
+- [ ] Claude eval adapter; Haiku + Opus on the eval sets; routing replay vs baselines
+- [ ] Automatic routing stage 1: first-message classifier, role aliases, per-repo keys, secret scan
+- [ ] Route badge + "try a stronger model" in Open WebUI
 
 ### v1-3 Handoff both ways + retrieval
 - [ ] Handoff Packet schema + validator
 - [ ] Synthetic policy KB indexed with embeddinggemma-2 (SQLite); `search_kb` tool; grounded-answer evals with citations
 - [ ] `ask_local_model` MCP server (endpoint URL from config)
-- [ ] `escalate_to_cloud` + `logs/escalations.db` (SQLite)
+- [ ] `escalate_to_cloud` with the four-tier table, routed per task type
+- [ ] Agents: Opus advisor + shadow advisor logging
+- [ ] Automatic routing stage 2: per-turn routing, advisor tool, restart-on-failure backstop; coding evals; routing A/B
+- [ ] Quality assurance: sampled audits, daily canary set, negative signals, automatic tier moves
 - [ ] `delegate-to-local` skill
 - [ ] Verified from Your Mac over Tailscale
 

@@ -31,8 +31,8 @@ check before moving on.
 | **Other AMD Radeon; Intel Arc or Iris Xe** | Vulkan (on by default; most Windows drivers include it) | Latest AMD or Intel graphics driver | `firstload.ps1 -Model <tag> -NoGpu` |
 
 Docker Desktop passes only NVIDIA GPUs into containers, so on AMD and Intel the isolated first load
-runs on the CPU. It's an isolation test, not a speed test; the host check in §4 then shows GPU use on the
-host. Integrated GPUs (Iris Xe, Radeon in Ryzen chips) share system RAM: count that as their memory.
+runs on the CPU. It's an isolation test, not a speed test; the host check in §4 (step 5) then shows GPU
+use on the host. Integrated GPUs (Iris Xe, Radeon in Ryzen chips) share system RAM: count that as their memory.
 
 ## 2. Tailscale (home node)
 1. Sign in to the Tailscale app on the PC. Use an account with two-factor on.
@@ -82,6 +82,9 @@ the size and capabilities, and say plainly what couldn't be verified:
   in the weights, so check the model card.
 - **Built-in behavior:** a hidden system prompt (`ollama show --system <tag>`), URLs in the template,
   or refusal tuning that would break the tasks you use it for (e.g. PII redaction).
+- After a pull, `uv run services/ollama/modelcheck.py safeguards <tag>` names the license family
+  (Apache 2.0/MIT pass; Gemma/Llama terms or no license warn; anything else fails) and shows any
+  hidden system prompt. `check` runs it too.
 
 1. **You approve** the exact tag and size.
 2. Pull: `ollama pull <tag>`
@@ -89,14 +92,18 @@ the size and capabilities, and say plainly what couldn't be verified:
    ```powershell
    uv run services\ollama\modelcheck.py verify <tag> --models-dir D:\ai\ollama
    ```
-4. **Isolated first load** in a `--network none` container, models mounted read-only (add `-NoGpu`
-   for AMD or Intel GPUs, see §1):
+4. **Isolated first load and model checks** (add `-NoGpu` for AMD or Intel GPUs, see §1):
    ```powershell
    pwsh -File services\ollama\firstload.ps1 -Model <tag>
    ```
-   Pass = a sensible answer, and on NVIDIA `ollama ps` showing **100% GPU**.
-5. **Model checks on the host**: synthetic prompt, tool call (required for chat models), and where
-   it runs (`--expect any` on AMD/Intel GPUs if Ollama splits the model):
+   Ollama runs in a `--network none` container with the models mounted read-only. The script waits
+   until it's up, then starts a second, throwaway container that shares the first one's network
+   (`--network container:ollama-firstload`, loopback only) and runs `modelcheck.py check` there:
+   safeguards (license, hidden system prompt), synthetic prompt, tool call (required for chat
+   models) and where it runs (100% GPU on NVIDIA, CPU with `-NoGpu`). The Python image is pinned by
+   digest in `services/ollama/config.json` (`checkImage`); Docker downloads it once, the model never
+   gets network. Pass = `All checks passed.` and exit code 0; read any `WARN` lines.
+5. **AMD or Intel GPU only: where it runs on the host** (`--expect any` if Ollama splits the model):
    ```powershell
    uv run services\ollama\modelcheck.py check <tag>
    ```

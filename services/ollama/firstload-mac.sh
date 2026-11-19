@@ -5,7 +5,7 @@
 #
 #   bash services/ollama/firstload-mac.sh <tag> [context]      e.g. qwen3.6:27b-mlx 8192
 #
-# Pass = every isolation check passes, then modelcheck.py passes: a sensible answer, a correct tool
+# Pass = every isolation check passes, then modelcheck.py passes: safeguards (read any WARN), a sensible answer, a correct tool
 # call, and 100% GPU on Apple silicon (Intel Macs run on the CPU). Embedding models get a vector check.
 # Only then use the model in the normal Ollama app.
 
@@ -104,9 +104,9 @@ pass "sandboxed server up on 127.0.0.1:$port"
 expect=gpu; [ "$arch" = "x86_64" ] && expect=cpu   # Intel Macs run on the CPU
 if uv run --quiet "$here/modelcheck.py" check "$model" --url "http://127.0.0.1:$port" --expect "$expect" \
         > "$scratch/checks.txt" 2>&1; then
-    grep -E '^(INFO|PASS|FAIL)' "$scratch/checks.txt"
+    grep -E '^(INFO|PASS|WARN|FAIL)' "$scratch/checks.txt"
 else
-    grep -E '^(INFO|PASS|FAIL)' "$scratch/checks.txt" || tail -5 "$scratch/checks.txt"
+    grep -E '^(INFO|PASS|WARN|FAIL)' "$scratch/checks.txt" || tail -5 "$scratch/checks.txt"
     fail "model checks (details above)"
 fi
 

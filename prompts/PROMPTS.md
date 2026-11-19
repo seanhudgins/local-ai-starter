@@ -6,6 +6,8 @@ Fill in the `[brackets]`. Every agent loads `AGENTS.md` (Claude Code via `CLAUDE
 ---
 
 ## 0. Start any session (any device)
+Claude Code does this by itself: the session-start hook runs `uv run ops/session.py` (machine, sync state,
+current step, next steps, inbox tasks). Paste this only in other agents.
 ```
 Read STATUS.md and docs/V1-SPEC.md. Run `hostname` and tell me which machine we're on.
 Then tell me: the current step, the next action, and whether it can be done on this machine.
@@ -57,7 +59,7 @@ Goal: evidence-based primary and fast model per machine, and a skill guide for e
 Step 0: move the model-check logic (tool-call test, answer check, sha256 verify, embedding check) into
 services/ollama/modelcheck.py with pytest tests, make the first-load scripts call it, and add ruff +
 pytest to CI.
-Step 1: draft 20–30 synthetic eval items as JSONL in evals/sets/ covering the 8 task types in V1-SPEC,
+Step 1: draft 80 synthetic eval items (10 per task type) as JSONL in evals/sets/ covering the 8 task types in V1-SPEC,
 each with an answer key. Fake names/DOBs/MRNs only. Show me 3 before writing the rest.
 Step 2: one eval runner (Python, uv, pytest-tested, openai client against the OpenAI-compatible API,
 reusing modelcheck.py): rule checks first (valid JSON, required fields, redaction regex), a grader
@@ -71,10 +73,10 @@ Step 4: for each chosen model, write skills/models/<model>/SKILL.md from the res
 ## v1-2 Gateway
 ```
 Phase: v1-2 Gateway.
-Build: LiteLLM in Docker (image pinned by digest) on your PC, in front of Ollama + Anthropic,
-Google and OpenRouter.
+Build: LiteLLM in Docker (image pinned by digest) on your PC, in front of Ollama + Anthropic
+and OpenRouter.
 - A launcher reads keys from Windows Credential Manager with keyring (names: localai/anthropic,
-  localai/google, localai/openrouter) and passes them only to the container. Give me the commands to
+  localai/openrouter) and passes them only to the container. Give me the commands to
   store each key myself; never ask me to paste a key into chat.
 - Virtual keys with budgets for: open-webui, goose, cline, mcp-local, evals. Aliases `auto`, `auto-coding`.
 - Per-call, daily, monthly caps.
@@ -83,6 +85,11 @@ Google and OpenRouter.
   OpenRouter's current docs first; settings and fees change.
 - Prices from router/ config and LiteLLM's price map, same as every provider; include OpenRouter's
   credit fee in $/task.
+- OpenRouter account and key: zero data retention enforced (ZDR-only setting + a guardrail on the key).
+- Tracing: OpenTelemetry (GenAI conventions, names in router/telemetry.py) to Langfuse and
+  to logs/telemetry.db; content only for synthetic runs.
+- Eval runner: an Anthropic adapter (Haiku 5.5, Opus 5.5) through the gateway; ask every model for its
+  confidence; then the routing replay vs always-local / always-Haiku / always-Opus / oracle.
 Before coding, ask me what caps I want. After, point Open WebUI, goose, Cline and the eval runner at
 the gateway, show me a test that proves a call over the cap is refused and one that proves an
 OpenRouter request without the privacy settings is refused. Then a ceiling run: the v1-1 eval set on
@@ -96,9 +103,11 @@ Phase: v1-3 Handoff both ways + retrieval.
 Build: (1) a JSON schema + validator for the Handoff Packet in docs/V1-SPEC.md; (2) an MCP server
 exposing ask_local_model(task, input, output_schema) that calls an OpenAI-compatible endpoint URL
 from config (gateway on your PC, local Ollama on the Mac) and returns a response packet;
-(3) escalate_to_cloud through the gateway with the three-tier table in V1-SPEC (local → big open
-model via OpenRouter → Claude, picked by the complexity score; tier models from router/ config), logging to
-SQLite (logs/escalations.db) with no raw content; (4) skills/delegate-to-local/SKILL.md; (5) RAG: a small synthetic policy knowledge base indexed
+(3) escalate_to_cloud through the gateway with the four-tier table in V1-SPEC §Routing (local → Claude
+Haiku → big open model via OpenRouter → Claude Opus, per task type from eval results; OpenRouter only for
+synthetic/redacted requests and only where cheaper per task than Opus; tier models from router/ config),
+traced with no raw content unless synthetic; agents get an Opus advisor plus a shadow
+advisor (claude-opus-4-8) whose advice is logged, never returned; (4) skills/delegate-to-local/SKILL.md; (5) RAG: a small synthetic policy knowledge base indexed
 with embeddinggemma-2 into SQLite, a search_kb tool, and eval items for grounded answers with citations.
 Rules: Python with uv; validate input and output; reject malformed packets; no secrets in code.
 Before coding, ask me questions. After, write tests and show me how to connect the server to Claude

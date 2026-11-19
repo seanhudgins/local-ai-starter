@@ -1,4 +1,5 @@
-# Runs on every push and pull request: secret scan, script checks, config checks.
+# Runs on every push and pull request: secret scan, script checks, config checks, types, tests on
+# Linux and Windows (both home machines' OS families), and a dependency vulnerability audit.
 # Third-party code is pinned: actions by commit SHA, gitleaks by version + published checksum.
 name: checks
 
@@ -53,8 +54,14 @@ jobs:
           uv run --locked ruff check .
           uv run --locked ruff format --check .
 
+      - name: Python types (mypy, version from uv.lock)
+        run: uv run --locked mypy
+
       - name: Python tests (pytest)
         run: uv run --locked pytest -q
+
+      - name: Dependency audit (pip-audit; new or expired findings fail)
+        run: uv run --no-project ops/audit.py
 
       - name: JSON configs (valid)
         run: |
@@ -63,3 +70,12 @@ jobs:
       - name: Personal-details scan (private repo only)
         if: hashFiles('publish/publish.py') != ''
         run: python3 -I publish/publish.py --check
+
+  windows-tests:
+    # The home PC runs Windows: catch Windows-only bugs (text encodings, paths) before it does.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - name: Python tests (pytest)
+        run: uv run --locked pytest -q

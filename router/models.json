@@ -1,0 +1,105 @@
+{
+  "_about": "The one list of local models: where each runs, who makes it, and what it's for. The model tables in README.md, docs/setup/MAC.md and docs/ARCHITECTURE.md are generated from this file (uv run ops/docs.py); edit here, not there. `country` feeds the model-origin rule (evals/run.py compare). `status`: active, testing, retire-candidate, retired.",
+  "machines": {
+    "pc": {
+      "label": "PC, RTX 4080 SUPER 16 GB"
+    },
+    "mac": {
+      "label": "Mac, M5 Pro 48 GB"
+    }
+  },
+  "models": [
+    {
+      "tag": "gemma4:12b",
+      "machine": "pc",
+      "maker": "Google",
+      "country": "US",
+      "license": "Apache 2.0",
+      "status": "active",
+      "use": "Everyday; leading the PC bake-off",
+      "size": "8 GB, ~8.7 GB loaded",
+      "first_load": "Passed 2026-11-03 in a no-network container: answer correct, 100% GPU; tool call correct 2026-11-05",
+      "speed": "147–160 tok/s",
+      "notes": "100% GPU"
+    },
+    {
+      "tag": "gpt-oss:20b",
+      "machine": "pc",
+      "maker": "OpenAI",
+      "country": "US",
+      "license": "Apache 2.0",
+      "status": "active",
+      "use": "Everyday, tool use",
+      "size": "13 GB, 12 GB loaded at 8K",
+      "first_load": "Passed 2026-11-03 in a no-network container: answer correct, 100% GPU; tool call correct 2026-11-05",
+      "speed": "136 tok/s",
+      "notes": "100% GPU, 12 GB at 8K context"
+    },
+    {
+      "tag": "gemma4:31b-mlx",
+      "machine": "mac",
+      "maker": "Google",
+      "country": "US",
+      "license": "Apache 2.0",
+      "status": "testing",
+      "use": "Everyday and hard questions (leading the bake-off)",
+      "size": "19 GB, 19 GB loaded at 16K",
+      "first_load": "Passed 2026-11-07: answer correct, 100% GPU (mlx), tool call correct, 1250/1250 files, no outbound attempts. Full eval passed 2026-11-07 (27/27 items all rules pass, 12.3 s/item) once the memory rail allowed its ~2 s dip to 19-23% free right after loading (rail: stop below 25% for over 5 s, or below 12% at once)",
+      "speed": "~35 tok/s",
+      "notes": "27/27 items pass all rule checks at 12 s/item (test run, 2026-11-07)"
+    },
+    {
+      "tag": "north-mini-code-1.0:mlx-nvfp4",
+      "machine": "mac",
+      "maker": "Cohere",
+      "country": "CA",
+      "license": "Apache 2.0",
+      "status": "active",
+      "use": "Coding",
+      "size": "19 GB, 19 GB loaded at 8K",
+      "first_load": "Passed 2026-11-04: answer correct, 100% GPU (mlx), tool call correct, 355/355 files, no outbound attempts",
+      "speed": "~85 tok/s",
+      "notes": "Coding; MLX"
+    },
+    {
+      "tag": "gemma4:26b-mlx",
+      "machine": "mac",
+      "maker": "Google",
+      "country": "US",
+      "license": "Apache 2.0",
+      "status": "retire-candidate",
+      "use": "Everyday, images (likely retired after judging)",
+      "size": "18 GB, 18 GB loaded at 8K",
+      "first_load": "Passed 2026-11-04: answer correct, 100% GPU (mlx), tool call correct, 1074/1074 files, no outbound attempts",
+      "speed": "~81 tok/s",
+      "notes": "Everyday; MLX"
+    },
+    {
+      "tag": "qwen3.6:27b-mlx",
+      "machine": "mac",
+      "maker": "Alibaba",
+      "country": "CN",
+      "license": "Apache 2.0",
+      "status": "retire-candidate",
+      "use": "Hard questions, images (likely retired after judging)",
+      "size": "18 GB on disk, 19 GB loaded at 8K",
+      "first_load": "Passed 2026-11-04: answer correct, 100% GPU, tool call correct, 1212/1212 files verified, no outbound attempts",
+      "speed": "~40 tok/s",
+      "notes": "Strong, dense model; slowest per eval item (31 s)"
+    },
+    {
+      "tag": "embeddinggemma-2:latest",
+      "machine": "mac",
+      "maker": "Google",
+      "country": "US",
+      "license": "Apache 2.0 (per Google's listing; Ollama ships no license file)",
+      "status": "active",
+      "use": "Document search only",
+      "size": "1.3 GB",
+      "first_load": "Passed 2026-11-04: returns a 768-number vector, 100% GPU (mlx), 1388/1388 files, no outbound attempts",
+      "speed": "Embedding only (for Open WebUI documents)",
+      "notes": "",
+      "embedding": true
+    }
+  ]
+}

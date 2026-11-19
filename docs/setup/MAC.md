@@ -79,8 +79,11 @@ stay out of the repo, and every new model gets an isolated first load before nor
    ```zsh
    bash services/ollama/check-mac.sh
    ```
-   Checks: the app is signed by Ollama and notarized by Apple, it listens on 127.0.0.1 only, and
-   cloud is off both in the config file and in the running server.
+   Checks: the app is signed by Ollama and notarized by Apple, it listens on 127.0.0.1 only,
+   cloud is off both in the config file and in the running server, and (once LuLu is set up, §6)
+   Ollama can't reach its registry. That last check asks Ollama to pull a random tag that can't
+   exist, so nothing is ever downloaded: a connection error = blocked (PASS), "file does not exist"
+   = it reached the registry (FAIL: LuLu rule left on Allow?).
 
 ## 5. Adding a model
 Pick for **this Mac** (48 GB shared memory; Intel Macs: small GGUF models only): the best speed and quality on its hardware. Matching
@@ -109,6 +112,9 @@ the size and capabilities, and say plainly what couldn't be verified:
   in the weights, so check the model card.
 - **Built-in behavior:** a hidden system prompt (`ollama show --system <tag>`), URLs in the template,
   or refusal tuning that would break contact-center tasks such as PII redaction.
+- After a pull, `uv run services/ollama/modelcheck.py safeguards <tag>` names the license family
+  (Apache 2.0/MIT pass; Gemma/Llama terms or no license warn; anything else fails) and shows any
+  hidden system prompt. `check` runs it too.
 
 **Adding it**
 1. **You approve** the exact tag and size.
@@ -200,7 +206,7 @@ curl -s http://127.0.0.1:11434/api/pull -d '{"model":"no-such-model:latest","str
 - Blocked: `connect: bad file descriptor`
 - Not blocked: `file does not exist` (it reached the registry)
 
-It downloads nothing either way.
+It downloads nothing either way. `bash services/ollama/check-mac.sh` runs this check for you.
 
 **Don't use the Block List for this.** LuLu's Block List (under Lists) takes a file of IP addresses or
 domains, not apps. App paths entered there do nothing.
@@ -240,14 +246,17 @@ The Mac's edge key (if any) lives in the **macOS Keychain**, read with Python `k
 files, env vars or chat. Provider keys for the gateway stay on your PC.
 
 ## Example models (author's hardware; yours will differ)
-| Tag | Size | First load (sandbox) | Speed |
-|---|---|---|---|
-| `qwen3.6:27b-mlx` | 18 GB on disk, 19 GB loaded at 8K | Passed 2026-11-04: answer correct, 100% GPU, tool call correct, 1212/1212 files verified, no outbound attempts | ~40 tok/s output, ~79 tok/s prompt |
-| `gemma4:26b-mlx` | 18 GB, 18 GB loaded at 8K | Passed 2026-11-04: answer correct, 100% GPU (mlx), tool call correct, 1074/1074 files, no outbound attempts | ~81 tok/s output |
-| `north-mini-code-1.0:mlx-nvfp4` | 19 GB, 19 GB loaded at 8K | Passed 2026-11-04: answer correct, 100% GPU (mlx), tool call correct, 355/355 files, no outbound attempts | ~85 tok/s output |
-| `embeddinggemma-2:latest` | 1.3 GB | Passed 2026-11-04: returns a 768-number vector, 100% GPU (mlx), 1388/1388 files, no outbound attempts | Embedding only (for Open WebUI documents) |
-
+<!-- generated:mac-models (from router/models.json; edit there, then run: uv run ops/docs.py) -->
+| Tag | Maker | Size | First load (sandbox) | Speed |
+|---|---|---|---|---|
+| `gemma4:31b-mlx` | Google (US) | 19 GB, 19 GB loaded at 16K | Passed 2026-11-07: answer correct, 100% GPU (mlx), tool call correct, 1250/1250 files, no outbound attempts. Full eval passed 2026-11-07 (27/27 items all rules pass, 12.3 s/item) once the memory rail allowed its ~2 s dip to 19-23% free right after loading (rail: stop below 25% for over 5 s, or below 12% at once) | ~35 tok/s |
+| `north-mini-code-1.0:mlx-nvfp4` | Cohere (CA) | 19 GB, 19 GB loaded at 8K | Passed 2026-11-04: answer correct, 100% GPU (mlx), tool call correct, 355/355 files, no outbound attempts | ~85 tok/s |
+| `gemma4:26b-mlx` | Google (US) | 18 GB, 18 GB loaded at 8K | Passed 2026-11-04: answer correct, 100% GPU (mlx), tool call correct, 1074/1074 files, no outbound attempts | ~81 tok/s |
+| `qwen3.6:27b-mlx` | Alibaba (CN) | 18 GB on disk, 19 GB loaded at 8K | Passed 2026-11-04: answer correct, 100% GPU, tool call correct, 1212/1212 files verified, no outbound attempts | ~40 tok/s |
+| `embeddinggemma-2:latest` | Google (US) | 1.3 GB | Passed 2026-11-04: returns a 768-number vector, 100% GPU (mlx), 1388/1388 files, no outbound attempts | Embedding only (for Open WebUI documents) |
+<!-- /generated -->
 Roles: **qwen3.6** strongest all-rounder (slowest); **gemma4:26b** fast everyday; **north-mini-code** coding agent;
-**embeddinggemma-2** document search. All four are Apache 2.0
+**embeddinggemma-2** document search; **gemma4:31b** American alternative to qwen3.6 for the primary slot
+(on test; the model-origin rule in `docs/V1-SPEC.md` decides which stay). All five are Apache 2.0
 (embeddinggemma-2 per Google's listing; Ollama ships no license file for it). Prompt-speed figures for
 the MLX models are left out because the warm run reuses the cached prompt.

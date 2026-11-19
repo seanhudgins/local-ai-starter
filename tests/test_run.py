@@ -58,10 +58,7 @@ def test_prompt_without_schema_has_no_schema_block():
 
 def test_item_filter_by_prefix():
     assert {i["id"] for i in er.load_items(only=["redact-", "intent-001"])} == {
-        "redact-001",
-        "redact-002",
-        "redact-003",
-        "redact-004",
+        *(f"redact-{n:03d}" for n in range(1, 11)),
         "intent-001",
     }
 
@@ -106,7 +103,7 @@ def test_export_then_import_round_trip(con, tmp_path):
 
 
 def test_import_rejects_out_of_range_scores(con, tmp_path):
-    run_id = er.run(["m:1"], ITEMS[:5], con, asker=FakeAsker(), memory=PLENTY)
+    run_id = er.run(["m:1"], [BY_ID["redact-001"]], con, asker=FakeAsker(), memory=PLENTY)
     p = er.to_judge(con, run_id, BY_ID)[0]
     bad = tmp_path / "bad.jsonl"
     bad.write_text(json.dumps({**p, "score": 9}) + "\n")
@@ -120,12 +117,12 @@ def test_report_compares_models(con):
     for item in ITEMS:
         con.execute(
             "INSERT INTO results SELECT run_id, item_id, 'bad:1', model_digest, task_type, industry, 'x', '', "
-            "1.0, 1, 0, rules_total, '[]', NULL, NULL, NULL FROM results WHERE run_id=? AND item_id=?",
+            "1.0, 1, 0, rules_total, '[]', NULL, NULL, NULL, item_sha FROM results WHERE run_id=? AND item_id=?",
             (run_id, item["id"]),
         )
     text = er.report(con, run_id)
     assert text.index("`good:1`") < text.index("`bad:1`")  # sorted best first
-    assert "| `good:1` | 27 | 27 | 100.0 |" in text
+    assert f"| `good:1` | {len(ITEMS)} | {len(ITEMS)} | 100.0 |" in text
 
 
 # ---------- safety rails ----------
@@ -210,6 +207,69 @@ def test_low_memory_mid_answer_raises():
     s.server.shutdown()
 
 
+class Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+
+def readings_guard(values, step=0.5):
+    """Feed a MemoryGuard one reading per `step` seconds; return the reading index where it tripped (or None)."""
+    clock, it = Clock(), iter(values)
+    guard = er.MemoryGuard(memory=lambda: next(it), clock=clock)
+    for i in range(len(values)):
+        if guard.check():
+            return i
+        clock.t += step
+    return None
+
+
+def test_guard_allows_a_short_dip():
+    """gemma4:31b-mlx, 2026-11-07: ~2 s at 19-23% right after loading, then 35-49%."""
+    assert readings_guard([90, 48, 35, 20, 19, 20, 25, 45, 40, 47] * 3) is None
+
+
+def test_guard_catches_a_slow_creep():
+    """The 2026-11-04 freeze: memory fell and stayed down."""
+    creep = [40, 35, 30, 26] + [24] * 20
+    tripped = readings_guard(creep)
+    assert tripped is not None and (tripped - 4) * 0.5 > er.LOW_GRACE_S  # only after the grace period
+
+
+def test_guard_hard_floor_trips_at_once():
+    assert readings_guard([90, 50, 11]) == 2
+
+
+def test_guard_resets_when_memory_recovers():
+    # two separate 4 s dips are each within the grace period
+    assert readings_guard(([20] * 8 + [50]) * 2) is None
+
+
+def test_stalled_answer_is_stopped_by_the_background_check(monkeypatch):
+    """No tokens arrive (the model is stuck loading or thinking); the watcher still unloads it."""
+    unloaded = []
+    monkeypatch.setattr(er, "unload", lambda model, url=None: unloaded.append(model))
+    monkeypatch.setattr(er, "WATCH_EVERY_S", 0.01)
+    readings = iter([90] + [5] * 1000)  # fine at the start, then below the hard floor
+    s = FakeStream([tok("x")] * 3, delay=0.3)
+    with pytest.raises(er.LowMemory):
+        er.ask("m:1", BY_ID["intent-001"], s.url, memory=lambda: next(readings))
+    assert unloaded == ["m:1"]
+    s.server.shutdown()
+
+
+def test_run_waits_out_a_short_dip_before_an_item(con, monkeypatch):
+    monkeypatch.setattr(er, "unload", lambda model, url=None: None)
+    slept = []
+    monkeypatch.setattr(er.time, "sleep", slept.append)
+    readings = iter([90, 90, 20, 20, 60] + [90] * 100)  # item 2: low, still low after reload, fine after grace
+    run_id = er.run(["m:1"], ITEMS[:3], con, asker=FakeAsker(), memory=lambda: next(readings))
+    assert con.execute("SELECT COUNT(*) FROM results WHERE run_id=?", (run_id,)).fetchone()[0] == 3
+    assert er.LOW_GRACE_S in slept
+
+
 def test_time_limit_stops_a_slow_answer(monkeypatch):
     monkeypatch.setattr(er, "ITEM_SECONDS", 0.2)
     s = FakeStream([tok("x")] * 50, delay=0.02)
@@ -260,3 +320,190 @@ def test_eval_set_dashes_survive_loading():
     raw = (Path(__file__).parent.parent / "evals" / "sets" / "contact-center.jsonl").read_bytes().decode("utf-8")
     assert "—" in raw and "—" in json.dumps(ITEMS, ensure_ascii=False)
     assert "â€" not in json.dumps(ITEMS, ensure_ascii=False)  # cp1252 mojibake of a dash
+
+
+# ---------- run records, fingerprints, sync and rebuild (2026-11-12) ----------
+
+
+def test_item_fingerprint_ignores_notes_only():
+    item = BY_ID["intent-001"]
+    assert er.item_sha(item) == er.item_sha({**item, "notes": "reworded note"})
+    assert er.item_sha(item) != er.item_sha({**item, "input": item["input"] + " "})
+
+
+def test_run_stamps_set_and_item_versions(con):
+    run_id = er.run(["m:1"], ITEMS[:3], con, asker=FakeAsker(), memory=PLENTY)
+    assert con.execute("SELECT set_sha FROM runs").fetchone()[0] == er.fingerprint(er.DEFAULT_SET.read_bytes())
+    shas = [r[0] for r in con.execute("SELECT item_sha FROM results WHERE run_id=? ORDER BY item_id", (run_id,))]
+    assert shas == sorted(er.item_sha(i) for i in ITEMS[:3]) or len(set(shas)) == 3
+
+
+def test_record_round_trip_keeps_grades_and_judge_calls(con, tmp_path):
+    run_id = er.run(["m:1"], [BY_ID["redact-001"]], con, asker=FakeAsker(), memory=PLENTY)
+    con.execute("UPDATE results SET judge='claude-opus-5-5', judge_score=4, judge_reason='ok'")
+    con.execute(
+        "INSERT INTO judge_calls (run_id, item_id, model, judge, usd, outcome, prompt_sha) VALUES (?,?,?,?,?,?,?)",
+        (run_id, "redact-001", "m:1", "claude-opus-5-5", 0.01, "ok", "abc"),
+    )
+    path = er.export_run(con, run_id, tmp_path / "runs")
+    assert path.name == f"{run_id}.jsonl"
+    other = er.connect(tmp_path / "other.db")
+    assert er.load(other, path) == (run_id, 1)
+    assert other.execute("SELECT judge_score FROM results").fetchone()[0] == 4
+    assert other.execute("SELECT usd, prompt_sha FROM judge_calls").fetchone()[:] == (0.01, "abc")
+
+
+def test_old_databases_gain_the_new_columns(tmp_path):
+    import sqlite3
+
+    db = tmp_path / "old.db"
+    old = sqlite3.connect(db)
+    old.execute(
+        "CREATE TABLE runs (run_id TEXT PRIMARY KEY, started TEXT, machine TEXT, ollama_version TEXT, "
+        "eval_set TEXT, note TEXT)"
+    )
+    old.commit()
+    old.close()
+    con = er.connect(db)
+    assert "set_sha" in {r["name"] for r in con.execute("PRAGMA table_info(runs)")}
+
+
+def test_old_run_files_without_new_columns_still_load(con, tmp_path):
+    path = tmp_path / "old.results.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "type": "run",
+                "run_id": "R1",
+                "started": "2026-11-05T15:46:55",
+                "machine": "PC1",
+                "ollama_version": "0.40.14",
+                "eval_set": "contact-center.jsonl",
+                "note": "",
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "type": "result",
+                "run_id": "R1",
+                "item_id": "intent-001",
+                "model": "m",
+                "answer": "x",
+                "error": "",
+                "future_column": 1,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert er.load(con, path) == ("R1", 1)
+
+
+def test_sync_loads_only_new_runs_and_rebuild_restores_everything(con, tmp_path):
+    runs = tmp_path / "runs"
+    a = er.run(["m:1"], ITEMS[:2], con, asker=FakeAsker(), memory=PLENTY)
+    er.export_run(con, a, runs)
+    db = tmp_path / "fresh.db"
+    fresh = er.connect(db)
+    assert er.sync(fresh, sorted(runs.glob("*.jsonl"))) == [a]
+    assert er.sync(fresh, sorted(runs.glob("*.jsonl"))) == []  # nothing new the second time
+    fresh.close()
+    backup, n = er.rebuild(db, sorted(runs.glob("*.jsonl")))
+    assert n == 1 and backup is not None and backup.exists()
+    assert er.connect(db).execute("SELECT COUNT(*) FROM results").fetchone()[0] == 2
+
+
+def test_gpu_guard(monkeypatch, tmp_path):
+    class Out:
+        def __init__(self, text):
+            self.stdout = text
+
+    calls = {"ps": {"models": []}}
+    monkeypatch.setattr(er.modelcheck, "call", lambda url, path, body=None, timeout=600: calls["ps"])
+    monkeypatch.setattr(er.subprocess, "run", lambda *a, **k: Out("85, 9000\n"))
+    assert "GPU busy" in er.gpu_in_use()
+    monkeypatch.setattr(er.subprocess, "run", lambda *a, **k: Out("3, 700\n"))
+    assert er.gpu_in_use() == ""
+    calls["ps"] = {"models": [{"name": "m"}]}
+    monkeypatch.setattr(er.subprocess, "run", lambda *a, **k: Out("85, 9000\n"))
+    assert er.gpu_in_use() == ""  # Ollama's own model explains the use
+
+    def no_smi(*a, **k):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(er.subprocess, "run", no_smi)
+    assert er.gpu_in_use() == ""  # no NVIDIA GPU (the Mac): never blocks
+
+
+def test_busy_gpu_defers_the_run(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(er, "gpu_in_use", lambda url: "GPU busy before the run: 90% use")
+    code = er.main(["--db", str(tmp_path / "r.db"), "run", "--models", "m:1"])
+    assert code == er.EX_TEMPFAIL and "NOT STARTED" in capsys.readouterr().out
+
+
+# ---------- compare: the model-origin rule ----------
+
+
+def S(passed, n=4, judge=None, judged=0, secs=10.0):  # noqa: N802
+    return {"n": n, "pass": passed, "judge": judge, "judged": judged, "secs": secs}
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "needs", "oa", "ob", "want"),
+    [
+        (S(4), S(3), 0, "CN", "US", "a"),  # one more item passing all rules is a real win
+        (S(4), S(4), 0, "CN", "US", "b"),  # a tie goes to the American model
+        (S(4), S(4), 0, "US", "US", ""),  # same origin: a plain tie
+        (S(4, judge=4.6, judged=4), S(4, judge=4.2, judged=4), 4, "CN", "US", "a"),  # 0.4 judge points
+        (S(4, judge=4.4, judged=4), S(4, judge=4.2, judged=4), 4, "CN", "US", "b"),  # 0.2: tie -> American
+        (S(4, judge=4.6, judged=4), S(4), 4, "CN", "US", "?"),  # rules tie and B isn't judged yet
+    ],
+)
+def test_verdict_follows_the_model_origin_rule(a, b, needs, oa, ob, want):
+    assert er.verdict(a, b, needs, oa, ob)[0] == want
+
+
+def test_decide_who_keeps_a_place():
+    assert er.decide("a", S(4), S(3), 0, "CN", "US") == "A, with B as the American fallback"
+    assert er.decide("b", S(4, secs=30), S(4, secs=10), 0, "CN", "US") == "B only"
+    # The Chinese loser is >=25% faster and meets the routine bar: cost may keep it for routine work.
+    assert "may keep routine work" in er.decide("b", S(4, secs=5), S(4, secs=10), 0, "CN", "US")
+    # ...but not if it misses the routine bar (an item failing its rules).
+    assert er.decide("b", S(3, secs=5), S(4, secs=10), 0, "CN", "US") == "B only"
+    assert er.decide("?", S(4), S(4), 4, "CN", "US") == "judge first"
+
+
+def test_compare_skips_items_answered_in_a_different_version(con):
+    a = er.run(["qwen:test"], [BY_ID["intent-001"], BY_ID["intent-002"]], con, asker=FakeAsker(), memory=PLENTY)
+    b = er.run(["gemma:test"], [BY_ID["intent-001"], BY_ID["intent-002"]], con, asker=FakeAsker(), memory=PLENTY)
+    con.execute("UPDATE results SET item_sha='old' WHERE run_id=? AND item_id='intent-002'", (a,))
+    out = er.compare(con, (a, "qwen:test"), (b, "gemma:test"), BY_ID)
+    assert "1 items compared; 1 skipped (different item versions)" in out
+    assert "| intent | 1 | 1 | 1 |" in out
+
+
+# ---------- more than one eval set (2026-11-13) ----------
+
+
+def test_set_path_finds_sets_by_name():
+    assert er.set_path("my-work") == er.SETS / "my-work.jsonl"
+    assert er.set_path("contact-center.jsonl") == er.DEFAULT_SET
+    with pytest.raises(SystemExit, match="no eval set"):
+        er.set_path("nope")
+
+
+def test_item_system_line_overrides_the_default():
+    work = er.load_items(er.set_path("my-work"))[0]
+    assert er.build_prompt(work)[0]["content"] == work["system"] != er.SYSTEM
+    assert er.build_prompt(BY_ID["intent-001"])[0]["content"] == er.SYSTEM
+
+
+def test_run_records_its_set_and_later_commands_reload_it(con):
+    path = er.set_path("my-work")
+    work = er.load_items(path)[:2]
+    run_id = er.run(["m:1"], work, con, asker=FakeAsker(), memory=PLENTY, set_file=path)
+    row = con.execute("SELECT eval_set, set_sha FROM runs WHERE run_id=?", (run_id,)).fetchone()
+    assert tuple(row) == ("my-work.jsonl", er.fingerprint(path.read_bytes()))
+    assert er.run_set(con, run_id) == path
+    assert er.run_set(con, "no-such-run") == er.DEFAULT_SET

@@ -7,13 +7,17 @@
     uv run ops/run_inbox.py            run pending tasks for this machine
     uv run ops/run_inbox.py --list     show them without running
     uv run ops/run_inbox.py --hook     quiet unless there's work (the post-merge hook uses this)
+    uv run ops/run_inbox.py add --machine your PC --check eval --model gemma4:12b --why "..."
+                                        add a task (validated here, before it's pushed)
 
 A task names a machine, a check and a model tag. Only the checks in ALLOWED can run, each mapped to
 a fixed `modelcheck.py` subcommand, and the tag is validated: the inbox can never hold an arbitrary
 command, even though the hook runs it automatically after `git pull`.
 
 Each result goes to ops/results/<task-id>.txt. A task with a result file is done, so it never runs
-twice; delete the file to run it again. Commit the results so the other machine can read them.
+twice; delete the file to run it again. An eval run also writes its record to evals/runs/. A task
+that exits with 75 ("try later", e.g. the GPU is busy with a game) gets no result file and runs again
+on the next pull. Commit the results so the other machine can read them.
 """
 
 from __future__ import annotations
@@ -39,7 +43,8 @@ TAG = re.compile(r"^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)?(:[a-z0-9][a-z0-
 TASK_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,60}$")
 EXPECT = {"gpu", "cpu", "any"}
 TIMEOUT = 20 * 60  # seconds; a cold load from a SATA drive can take a minute or two
-EVAL_TIMEOUT = 3 * 60 * 60  # a full eval run on one model (27 items, each capped at 5 minutes)
+EVAL_TIMEOUT = 3 * 60 * 60  # one model on the full set: ~5-30 s per item normally; each item is capped at 5 min
+TRY_LATER = 75  # exit code for "not now" (evals/run.py EX_TEMPFAIL): leave the task pending
 
 
 def this_machine() -> str:
@@ -65,9 +70,8 @@ def command(task: dict) -> list[str]:
     if check == "eval":
         if "expect" in task:
             raise ValueError("expect isn't allowed on eval tasks")
-        # Answers and rule-check results come back through git as ops/results/<id>.results.jsonl
-        out = (task.get("_results_dir") or RESULTS) / f"{tid}.results.jsonl"
-        return [sys.executable, str(EVAL_RUN), "run", "--models", model, "--note", f"inbox {tid}", "--out", str(out)]
+        # Answers and rule-check results come back through git in evals/runs/<run_id>.jsonl
+        return [sys.executable, str(EVAL_RUN), "run", "--models", model, "--note", f"inbox {tid}"]
     cmd = [sys.executable, str(MODELCHECK), check, model]
     if "expect" in task:
         if check != "check" or task["expect"] not in EXPECT:
@@ -102,6 +106,9 @@ def run(task: dict, machine: str, results: Path | None = None) -> int:
         code, output, shown = 2, f"REFUSED  {e}\n", "(not run)"
     except subprocess.TimeoutExpired:
         code, output, shown = 3, f"TIMEOUT  after {limit}s\n", " ".join([Path(cmd[1]).name, *cmd[2:]])
+    if code == TRY_LATER:
+        print(f"  deferred: {task.get('id')} ({output.strip().splitlines()[-1] if output.strip() else 'try later'})")
+        return code
     header = (
         f"task: {task.get('id')}\nmachine: {machine}\nwhen: {datetime.now().isoformat(timespec='seconds')}\n"
         f"why: {task.get('why', '')}\ncommand: {shown}\nexit: {code}\n\n"
@@ -110,7 +117,48 @@ def run(task: dict, machine: str, results: Path | None = None) -> int:
     return code
 
 
+def add(machine: str, check: str, model: str, why: str, expect: str | None = None, inbox: Path | None = None) -> dict:
+    """Append a task after validating it exactly as the receiving machine will, so a bad task fails here."""
+    inbox = inbox or INBOX
+    slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
+    task: dict = {
+        "id": f"{datetime.now():%Y-%m-%d}-{machine.lower()}-{check}-{slug}"[:61].rstrip("-"),
+        "machine": machine,
+        "check": check,
+        "model": model,
+        "why": why,
+    }
+    if expect:
+        task["expect"] = expect
+    if not why.strip():
+        raise ValueError("say why the task is needed (--why)")
+    command(task)  # raises ValueError if the receiving machine would refuse it
+    data = json.loads(inbox.read_text(encoding="utf-8")) if inbox.is_file() else {"tasks": []}
+    if any(t.get("id") == task["id"] for t in data["tasks"]):
+        raise ValueError(f"task {task['id']} already exists (delete its result file to rerun it)")
+    data["tasks"].append(task)
+    inbox.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return task
+
+
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv[:1] == ["add"]:
+        ap = argparse.ArgumentParser(prog="run_inbox.py add", description="Add a task for another machine.")
+        ap.add_argument("--machine", required=True, help="hostname of the machine that should run it")
+        ap.add_argument("--check", required=True, choices=sorted(ALLOWED))
+        ap.add_argument("--model", required=True)
+        ap.add_argument("--why", required=True)
+        ap.add_argument("--expect", choices=sorted(EXPECT))
+        opts = ap.parse_args(argv[1:])
+        try:
+            task = add(opts.machine, opts.check, opts.model, opts.why, opts.expect)
+        except ValueError as e:
+            print(f"REFUSED  {e}")
+            return 2
+        print(f"added {task['id']}. Commit and push ops/inbox.json; it runs on {opts.machine}'s next `git pull`.")
+        return 0
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--list", action="store_true", help="show pending tasks without running them")
     p.add_argument("--hook", action="store_true", help="quiet unless there's work")
@@ -130,9 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     failed = 0
     for t in todo:
         code = run(t, machine)
+        if code == TRY_LATER:
+            continue
         failed += code != 0
         print(f"  {'done' if code == 0 else f'FAILED (exit {code})'}: {t.get('id')} -> ops/results/{t.get('id')}.txt")
-    print("Commit and push ops/results/ so the other machine can read them.")
+    print("Commit and push ops/results/ and evals/runs/ so the other machine can read them.")
     return 1 if failed else 0
 
 

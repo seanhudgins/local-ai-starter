@@ -4,4 +4,8 @@
 if [ -f ops/run_inbox.py ] && command -v uv >/dev/null 2>&1; then
     uv run --quiet ops/run_inbox.py --hook || echo "Some inbox tasks failed; see ops/results/." >&2
 fi
+# Load eval runs the other machine pushed (evals/runs/) into this machine's local results database.
+if [ -f evals/run.py ] && [ -f evals/results.db ] && command -v uv >/dev/null 2>&1; then
+    uv run --quiet --no-project evals/run.py sync || echo "Couldn't load new eval runs; run: uv run evals/run.py sync" >&2
+fi
 exit 0

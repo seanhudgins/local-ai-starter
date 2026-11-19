@@ -9,10 +9,12 @@
     uv run services/ollama/modelcheck.py tools  <tag> [--url URL]           tool-call test only
     uv run services/ollama/modelcheck.py answer <tag> [--url URL]           synthetic prompt only
     uv run services/ollama/modelcheck.py embed  <tag> [--url URL]           embedding models only
+    uv run services/ollama/modelcheck.py safeguards <tag> [--url URL]       license + hidden system prompt
 
-`check` reads the model's capabilities and runs what applies: chat models get the synthetic
-contact-center prompt, a tool-call test (tools are required) and a GPU check; embedding models get a
-vector check. The first-load scripts call it after setting up isolation. Exit code = failed checks.
+`check` reads the model's capabilities and runs what applies: the safeguard check for every model,
+then chat models get the synthetic contact-center prompt, a tool-call test (tools are required) and a
+GPU check; embedding models get a vector check. The first-load scripts call it after setting up
+isolation. Exit code = failed checks (WARN lines don't count; a person reads them).
 """
 
 from __future__ import annotations
@@ -57,9 +59,10 @@ EXPECTED_CALL = ("get_account_balance", "ACCT-1042")
 class Result:
     ok: bool
     message: str
+    warn: bool = False  # passed, but a person should read it before using the model
 
     def line(self) -> str:
-        return f"{'PASS' if self.ok else 'FAIL'}  {self.message}"
+        return f"{'FAIL' if not self.ok else 'WARN' if self.warn else 'PASS'}  {self.message}"
 
 
 # ---------- Ollama API ----------
@@ -182,6 +185,78 @@ def check_processor(url: str, model: str, expect: str) -> Result:
     return Result(True, where)
 
 
+# Ordered: the first family whose markers all appear wins, so a restrictive license bundled with a
+# permissive one (Ollama joins every license layer into one text) is never reported as permissive.
+LICENSES: list[tuple[str, tuple[str, ...], str]] = [
+    ("non-commercial", ("non-commercial",), "fail"),
+    ("non-commercial", ("noncommercial",), "fail"),
+    ("non-commercial", ("cc-by-nc",), "fail"),
+    ("non-commercial", ("cc by-nc",), "fail"),
+    ("Gemma terms", ("gemma terms of use",), "warn"),
+    ("Llama / Meta license", ("llama", "community license"), "warn"),
+    ("Llama / Meta license", ("meta platforms", "acceptable use policy"), "warn"),
+    ("Apache 2.0", ("apache license", "version 2.0"), "pass"),
+    ("MIT", ("permission is hereby granted, free of charge",), "pass"),
+]
+
+
+def license_family(text: str) -> tuple[str, str]:
+    """(family, verdict) for a license text; verdict is "pass", "warn" or "fail"."""
+    low = " ".join(text.lower().split())
+    if not low:
+        return "none", "warn"
+    for family, markers, verdict in LICENSES:
+        if all(m in low for m in markers):
+            return family, verdict
+    return "other/unknown", "fail"
+
+
+def system_prompt(show: dict) -> str:
+    """The model's built-in SYSTEM prompt: the `system` field, or SYSTEM lines in the Modelfile."""
+    if text := (show.get("system") or "").strip():
+        return text
+    found = [ln[len("SYSTEM") :] for ln in (show.get("modelfile") or "").splitlines() if ln.startswith("SYSTEM ")]
+    return " ".join(f.strip().strip('"') for f in found).strip()
+
+
+def check_safeguards(url: str, model: str) -> list[Result]:
+    """License family and any hidden system prompt, read from /api/show (no model load).
+
+    License verdicts:
+    - Apache 2.0 or MIT: PASS. Permissive, no use restrictions, and the text can't change later.
+    - Gemma terms or the Llama/Meta license: WARN. Usable here, but they carry an acceptable-use
+      policy the maker can update, and Llama adds user-count and naming rules: a person reads them.
+    - Non-commercial (e.g. CC BY-NC) or text that matches no known family: FAIL. A restriction we
+      can't see is a risk, so someone must read it and decide before the model is used.
+    - No license layer at all: WARN, not FAIL. Many repackaged models ship without one; the license
+      then has to be found at the source (docs/setup), which this offline check can't do.
+    A non-empty built-in SYSTEM prompt is a WARN: it silently steers every answer, so a person reads it.
+    """
+    show = call(url, "/api/show", {"model": model})
+    lic = show.get("license") or ""
+    if isinstance(lic, list):  # older servers sent one entry per license layer
+        lic = "\n".join(lic)
+    family, verdict = license_family(lic)
+    if family == "none":
+        lic_result = Result(True, "license: none in the model; find it at the source before use", warn=True)
+    elif verdict == "pass":
+        lic_result = Result(True, f"license: {family}")
+    elif verdict == "warn":
+        lic_result = Result(True, f"license: {family} (use policy the maker can change; read it)", warn=True)
+    elif family == "other/unknown":
+        first = " ".join(lic.split())[:80]
+        lic_result = Result(False, f"license: not a known family, read it and decide ({first!r})")
+    else:
+        lic_result = Result(False, f"license: {family}, not allowed for this project's use")
+    system = system_prompt(show)
+    sys_result = (
+        Result(True, f"hidden system prompt: {' '.join(system.split())[:120]!r}", warn=True)
+        if system
+        else Result(True, "no built-in system prompt")
+    )
+    return [lic_result, sys_result]
+
+
 def check(url: str, model: str, expect: str = "gpu") -> list[Result]:
     caps = capabilities(url, model)
     ident = identity(url, model)
@@ -189,10 +264,11 @@ def check(url: str, model: str, expect: str = "gpu") -> list[Result]:
         f"INFO  {model} on Ollama {ident['ollama_version']}, digest {ident['model_digest'][:12]}, "
         f"capabilities: {', '.join(caps) or 'none'}"
     )
+    results = check_safeguards(url, model)
     if "embedding" in caps:
-        results = [check_embed(url, model)]
+        results.append(check_embed(url, model))
     else:
-        results = check_answer(url, model) + [check_tools(url, model, caps)]
+        results += check_answer(url, model) + [check_tools(url, model, caps)]
     results.append(check_processor(url, model, expect))
     return results
 
@@ -244,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter
     )
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("check", "tools", "answer", "embed", "verify"):
+    for name in ("check", "tools", "answer", "embed", "safeguards", "verify"):
         sp = sub.add_parser(name)
         sp.add_argument("model")
         if name == "verify":
@@ -264,6 +340,8 @@ def main(argv: list[str] | None = None) -> int:
             results = [check_tools(a.url, a.model)]
         elif a.cmd == "answer":
             results = check_answer(a.url, a.model)
+        elif a.cmd == "safeguards":
+            results = check_safeguards(a.url, a.model)
         else:
             results = [check_embed(a.url, a.model)]
     except OllamaError as e:
@@ -272,7 +350,9 @@ def main(argv: list[str] | None = None) -> int:
     for r in results:
         print(r.line())
     fails = sum(not r.ok for r in results)
-    print("\nAll checks passed." if not fails else f"\n{fails} check(s) failed.")
+    warns = sum(r.ok and r.warn for r in results)
+    note = f" {warns} warning(s) to read above." if warns else ""
+    print(f"\nAll checks passed.{note}" if not fails else f"\n{fails} check(s) failed.{note}")
     return fails
 
 

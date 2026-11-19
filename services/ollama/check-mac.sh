@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check Ollama's safety settings on the Mac (docs/setup/MAC.md). Loads no model; run any time.
+# Check Ollama's safety settings on the Mac (docs/setup/MAC.md). Loads and downloads no model; run any time.
 #   bash services/ollama/check-mac.sh
 # First load of a new model is a separate step: services/ollama/firstload-mac.sh.
 set -u
@@ -40,6 +40,27 @@ if [ -f "$log" ]; then
     grep 'Ollama cloud disabled' "$log" | tail -1 | grep -q 'true' \
         && pass "running server reports cloud disabled" \
         || fail "running server doesn't report cloud disabled (quit and reopen Ollama)"
+fi
+
+# 4. LuLu blocks Ollama's outbound traffic (docs/setup/MAC.md, section 6). Ask the running server to
+#    pull a random tag that can't exist: it fails at the manifest lookup, so nothing is ever
+#    downloaded. A connection error = blocked; "file does not exist" = it reached the registry.
+probe="localai-lulu-probe-$RANDOM$RANDOM:none-$(date +%s)"
+reply="$(curl -s -m 30 http://127.0.0.1:11434/api/pull -d "{\"model\":\"$probe\",\"stream\":false}")"
+if [ -z "$reply" ]; then
+    fail "no reply from Ollama to the outbound probe (is the app running?)"
+elif echo "$reply" | grep -q '"status":"success"'; then
+    fail "probe tag $probe pulled?! Remove it (ollama rm $probe) and check the registry"
+elif echo "$reply" | grep -qiE 'file does not exist|manifest unknown|not found'; then
+    fail "Ollama reached its registry (LuLu rule for Ollama left on Allow?)"
+elif echo "$reply" | grep -qiE 'dial tcp|connect:|no such host|network is unreachable|i/o timeout|connection refused'; then
+    if curl -s -m 5 -o /dev/null https://registry.ollama.ai/v2/; then
+        pass "Ollama can't reach its registry; this Mac can (LuLu is blocking Ollama)"
+    else
+        echo "INFO  Ollama can't reach its registry, but this Mac looks offline too; LuLu not proven"
+    fi
+else
+    fail "unexpected reply to the outbound probe: $(echo "$reply" | cut -c1-160)"
 fi
 
 echo

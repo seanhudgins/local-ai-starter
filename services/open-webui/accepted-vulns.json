@@ -1,0 +1,420 @@
+{
+  "CVE-2026-114134": {
+    "package": "black",
+    "version": "26.5.1",
+    "fix": [
+      "26.10.1"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-116672": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.1"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119203": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.4"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119204": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.4"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119205": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.4"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119206": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.3"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119207": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.3"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119208": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.3"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119209": {
+    "package": "pypdf",
+    "version": "6.21.2",
+    "fix": [
+      "6.21.3"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119283": {
+    "package": "joserfc",
+    "version": "1.7.4",
+    "fix": [
+      "1.7.5"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-119284": {
+    "package": "joserfc",
+    "version": "1.7.4",
+    "fix": [
+      "1.7.6"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "CVE-2026-96760": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "GHSA-pxh4-856f-4h89": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-113": {
+    "package": "pyarrow",
+    "version": "20.0.0",
+    "fix": [
+      "23.0.1"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-2114": {
+    "package": "anthropic",
+    "version": "0.86.0",
+    "fix": [
+      "0.87.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-2115": {
+    "package": "anthropic",
+    "version": "0.86.0",
+    "fix": [
+      "0.87.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-311": {
+    "package": "chromadb",
+    "version": "1.5.9",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3552": {
+    "package": "cryptography",
+    "version": "48.0.1",
+    "fix": [
+      "50.0.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3553": {
+    "package": "cryptography",
+    "version": "48.0.1",
+    "fix": [
+      "49.0.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3554": {
+    "package": "cryptography",
+    "version": "48.0.1",
+    "fix": [
+      "49.0.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3804": {
+    "package": "accelerate",
+    "version": "1.13.0",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3813": {
+    "package": "chromadb",
+    "version": "1.5.9",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3814": {
+    "package": "chromadb",
+    "version": "1.5.9",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3815": {
+    "package": "chromadb",
+    "version": "1.5.9",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-3929": {
+    "package": "transformers",
+    "version": "5.5.4",
+    "fix": [
+      "5.10.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4140": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4141": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.15.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4142": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4143": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4144": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4145": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4146": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4147": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4148": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4149": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4150": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4151": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4152": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.14.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4164": {
+    "package": "sentence-transformers",
+    "version": "5.5.1",
+    "fix": [
+      "5.6.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4174": {
+    "package": "transformers",
+    "version": "5.5.4",
+    "fix": [],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4183": {
+    "package": "pyjwt",
+    "version": "2.13.0",
+    "fix": [
+      "2.15.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4354": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.8.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4355": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4356": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.1"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4357": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4358": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4359": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  },
+  "PYSEC-2026-4360": {
+    "package": "authlib",
+    "version": "1.7.2",
+    "fix": [
+      "1.9.0"
+    ],
+    "reason": "reviewed: tailnet-only, single user; waiting for upstream to unpin",
+    "review_by": "2026-12-12"
+  }
+}

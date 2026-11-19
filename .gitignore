@@ -41,6 +41,8 @@ node_modules/
 # Open WebUI secret key (lives in D:\ai\open-webui\data; never in the repo)
 .webui_secret_key
 
-# Eval test runs: local only (the official run is exported to logs/ and committed)
+# Eval results: the database is a local cache rebuilt from evals/runs/*.jsonl (committed) with
+# `uv run evals/run.py rebuild`; judging/ holds scratch files for grading by hand.
 evals/results.db
+evals/results.*.bak
 evals/judging/

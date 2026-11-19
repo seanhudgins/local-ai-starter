@@ -3,10 +3,17 @@ name = "local-ai"
 version = "0.1.0"
 description = "Local AI tooling: model checks now; eval runner, gateway launcher and MCP server in later steps."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "anthropic>=2.7.0",
+    "keyring>=25.7.0",
+]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.8"]
+dev = [
+    "mypy>=2.4.1",
+    "pytest>=8",
+    "ruff>=0.8",
+]
 
 [tool.uv]
 package = false
@@ -27,3 +34,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # The sanitizer's rules are long regex/replacement pairs; one rule per line is easier to review.
 "publish/publish.py" = ["E501"]
+
+[tool.mypy]
+# Fitness check in CI: the code is written typed, so keep it that way.
+files = ["evals", "services/ollama/modelcheck.py", "ops", "tools/claude-hooks", "tools/git-alias", "publish/publish.py"]
+ignore_missing_imports = true
+check_untyped_defs = true
+explicit_package_bases = true

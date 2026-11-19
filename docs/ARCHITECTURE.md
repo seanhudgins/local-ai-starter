@@ -16,12 +16,12 @@ flowchart LR
         end
         subgraph PC["Home PC (GPU)"]
             TS["tailscale serve<br/>HTTPS :443"] --> WU["Open WebUI<br/>127.0.0.1:8080"] --> OL["Ollama<br/>127.0.0.1:11434"]
-            GW["LiteLLM gateway :4000<br/>(v1-4, planned)"]
+            GW["LiteLLM gateway :4000<br/>(v1-2, planned)"]
         end
     end
     Phone -- "HTTPS :443 only" --> TS
     Mac -- "HTTPS :443 only" --> TS
-    GW -. "capped, logged escalations" .-> Cloud["Claude / Gemini / OpenRouter"]
+    GW -. "capped, logged escalations" .-> Cloud["Claude Haiku / OpenRouter / Claude Opus"]
 ```
 
 Only port 443 on the PC is reachable from other devices (4000 is reserved for the gateway).
@@ -49,21 +49,27 @@ Ollama, Open WebUI's raw port, SSH, RDP and SMB are blocked, and an edge check s
 | 7 | **Pinned, hash-locked dependencies** | Reproducible installs; a tampered package fails the hash | Floating versions |
 | 8 | **Private working repo + sanitized public copy** | Build freely with personal context; share a clean, reusable version | One repo with personal details; inviting people to the private repo |
 | 9 | **Machine inbox** (`ops/inbox.json`): one machine leaves checks for another; it runs them on `git pull` and commits the results | Work crosses machines with no inbound access (pull-based, like GitOps tools). Only an allowlist of `modelcheck.py` checks can run, arguments are validated and never pass through a shell (tests try injection); hooks are opt-in because git never runs a repo's hooks unless you set `core.hooksPath` | Self-hosted GitHub Actions runner (an always-on service; unsafe on public repos), SSH from the Mac (inbound access), asking a person to run it |
-| 10 | **OpenRouter as the middle tier** (local → big open model → Claude), also used for an eval ceiling row, try-before-download and a second judge | Measures what running locally costs in quality; cheaper escalations than going straight to Claude; evidence before an 18 GB download. Privacy enforced in the gateway: synthetic/redacted data only, no data collection, zero retention, provider pinned for evals | Straight local → Claude (no middle price point), downloading every candidate to test it, a direct key per open-model vendor |
+| 10 | **Four routing tiers: local → Claude Haiku → big open model via OpenRouter → Claude Opus**, routed per task type from eval results; OpenRouter also for an eval ceiling row, try-before-download and a second judge | Haiku 5.5 now costs less than most big open models; per-task-type eval data beats hand-written complexity scores in routing research; OpenRouter kept as a step before Opus only for synthetic or redacted requests and only where it's cheaper per task than Opus. Privacy enforced in the gateway and at the OpenRouter account and key | OpenRouter as the only middle tier (the 2026-11-05 design), dropping OpenRouter from routing, a complexity score as the main signal, downloading every candidate to test it |
 | 11 | **One retrieval store behind MCP** (the "Open Brain" pattern), self-hosted: SQLite + local embeddings on the home PC, `search_kb` on the MCP server | Every tier (local, OpenRouter, Claude) answers from the same knowledge, so the business case compares models, not data. Local keeps it private; our own code keeps the public copy MIT. Read-only and synthetic in v1; agent-written personal memory is Later | Hosted Postgres/pgvector (data leaves the house), a separate store per tool, reusing a source-available memory repo |
 | 12 | **Our own router, not a commercial auto-router** (Abacus.AI RouteLLM considered) | Routing rules we can explain, test and tune from eval data; privacy settings we control in the gateway. RouteLLM may appear only as an optional comparison column in the v1-4 business case | Adopting RouteLLM or a multi-model subscription as the router (black-box choices, credit pricing, overlaps LiteLLM + OpenRouter + Claude Code) |
+| 13 | **Our own small eval runner** (rule checks first, Claude grades only rubric items, results in SQLite) | Every number in the skill guides and the business case traces back to a SQL query over stamped results (machine, Ollama version, model digest, judge, cost per call). Building it shows the mechanics: memory rails for Apple silicon, spend caps on the judge | promptfoo, UK AISI Inspect (more features, less to learn from; worth comparing against later) |
+| 14 | **Self-hosted Langfuse for tracing** behind the gateway (v1-2) | A trace per request (latency, tokens, cost per key) from one LiteLLM setting; open source and local, so prompts stay in the house | Hosted observability (data leaves), log files only (no per-request view) |
+
+Decisions 15 onward are one file each in [`decisions/`](decisions/) (folder layout, agent harness timing, coding route (superseded), Mac overflow, the retrieval store on the NAS later, routing by measured task type, observability, automatic routing and open-model coding, routing quality assurance, the learning loop, the model archive). The cross-repo map is [`WORKSPACE.md`](WORKSPACE.md).
 
 ## Measured results (example hardware)
+<!-- generated:arch-measured (from router/models.json; edit there, then run: uv run ops/docs.py) -->
 | Machine | Model | Output speed | Notes |
 |---|---|---|---|
 | PC, RTX 4080 SUPER 16 GB | `gemma4:12b` | 147–160 tok/s | 100% GPU |
 | PC, RTX 4080 SUPER 16 GB | `gpt-oss:20b` | 136 tok/s | 100% GPU, 12 GB at 8K context |
+| Mac, M5 Pro 48 GB | `gemma4:31b-mlx` | ~35 tok/s | 27/27 items pass all rule checks at 12 s/item (test run, 2026-11-07) |
 | Mac, M5 Pro 48 GB | `north-mini-code-1.0:mlx-nvfp4` | ~85 tok/s | Coding; MLX |
 | Mac, M5 Pro 48 GB | `gemma4:26b-mlx` | ~81 tok/s | Everyday; MLX |
-| Mac, M5 Pro 48 GB | `qwen3.6:27b-mlx` | ~40 tok/s | Strongest, dense model |
-
+| Mac, M5 Pro 48 GB | `qwen3.6:27b-mlx` | ~40 tok/s | Strong, dense model; slowest per eval item (31 s) |
+<!-- /generated -->
 ## Roadmap
 v1-1 bake-off on both machines + a skill guide per chosen model → v1-2 LiteLLM gateway (one entry
-point, keys, budgets, caps; an OpenRouter ceiling run of the eval set) → v1-3 handoff both ways (Claude → local via MCP, local → cloud via the
-gateway, three tiers: local → OpenRouter → Claude) plus retrieval over a synthetic policy knowledge base → v1-4 recorded demo, local / open-model / Claude business case, benchmark report, services at boot, backup + restore test.
+point, keys, budgets, caps, Langfuse tracing; an OpenRouter ceiling run of the eval set) → v1-3 handoff both ways (Claude → local via MCP, local → cloud via the
+gateway, four tiers: local → Haiku → OpenRouter → Opus, with OpenTelemetry tracing) plus retrieval over a synthetic policy knowledge base → v1-4 recorded demo with a TypeScript page, local / open-model / Claude business case, benchmark report, services at boot, backup + restore test.
 Each version ships a demo and a tagged release. Details: [`V1-SPEC.md`](V1-SPEC.md).

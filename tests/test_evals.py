@@ -10,8 +10,12 @@ from pathlib import Path
 import checks as ck
 import pytest
 
-SET = Path(__file__).parent.parent / "evals" / "sets" / "contact-center.jsonl"
+SETS = Path(__file__).parent.parent / "evals" / "sets"
+SET = SETS / "contact-center.jsonl"
+WORK = SETS / "my-work.jsonl"
 ITEMS = [json.loads(line) for line in SET.read_text().splitlines() if line.strip()]
+WORK_ITEMS = [json.loads(line) for line in WORK.read_text().splitlines() if line.strip()]
+ALL_ITEMS = ITEMS + WORK_ITEMS
 BY_TYPE = {t: [i for i in ITEMS if i["task_type"] == t] for t in {i["task_type"] for i in ITEMS}}
 KNOWN = {
     "exact_label",
@@ -30,14 +34,14 @@ KNOWN = {
 
 
 def test_set_shape():
-    assert len(ITEMS) == 27
+    assert len(ITEMS) == 80
     assert len({i["id"] for i in ITEMS}) == len(ITEMS)
     prefixes = {i["id"].split("-")[0] for i in ITEMS}
     assert prefixes == {"intent", "redact", "summary", "extract", "qa", "risk", "followup", "route"}
     assert {i["industry"] for i in ITEMS} == {"healthcare", "banking"}
 
 
-@pytest.mark.parametrize("item", ITEMS, ids=lambda i: i["id"])
+@pytest.mark.parametrize("item", ALL_ITEMS, ids=lambda i: i["id"])
 def test_item_is_well_formed(item):
     for key in ("id", "task_type", "industry", "instructions", "input", "checks", "reference"):
         assert key in item, key
@@ -50,10 +54,41 @@ def test_item_is_well_formed(item):
     assert item["grader"] is None or "rubric" in item["grader"]
 
 
-@pytest.mark.parametrize("item", ITEMS, ids=lambda i: i["id"])
+@pytest.mark.parametrize("item", ALL_ITEMS, ids=lambda i: i["id"])
 def test_reference_answer_passes_its_own_checks(item):
     results = ck.run_checks(item, ck.reference_reply(item))
     assert all(r.ok for r in results), [(r.check, r.detail) for r in results if not r.ok]
+
+
+def test_my_work_set_shape():
+    """32 knowledge-work tasks, 8 per workflow, all judged, each with its own system line and judge subject."""
+    assert len(WORK_ITEMS) == 32
+    assert len({i["id"] for i in ALL_ITEMS}) == len(ALL_ITEMS)  # ids unique across sets
+    counts: dict[str, int] = {}
+    for i in WORK_ITEMS:
+        counts[i["task_type"]] = counts.get(i["task_type"], 0) + 1
+        assert i["id"].startswith(i["task_type"] + "-") and i["industry"] == "knowledge-work"
+        assert i["system"] and i["judge_subject"] and i["grader"]["rubric"]
+    assert counts == {"code": 8, "docs": 8, "slides": 8, "research": 8}
+
+
+@pytest.mark.parametrize("item", [i for i in WORK_ITEMS if i["task_type"] == "research"], ids=lambda i: i["id"])
+def test_research_answer_citing_a_missing_source_fails(item):
+    """A citation to a source that isn't in the input must fail the rule checks."""
+    assert not all(r.ok for r in ck.run_checks(item, ck.reference_reply(item) + " [S9]"))
+
+
+def test_slide_count_limits_are_enforced():
+    item = next(i for i in WORK_ITEMS if i["id"] == "slides-006")  # exactly 3 slides
+    four = dict(item["reference"], slides=item["reference"]["slides"] + [{"title": "Extra", "bullets": ["More"]}])
+    assert not ck.run_checks(item, json.dumps(four))[0].ok
+
+
+def test_schema_list_and_string_lengths():
+    schema = {"type": "array", "minItems": 1, "maxItems": 2, "items": {"type": "string", "minLength": 2}}
+    assert ck.schema_errors(["ab"], schema) == []
+    assert ck.schema_errors([], schema) and ck.schema_errors(["ab", "cd", "ef"], schema)
+    assert ck.schema_errors([" a "], schema)  # whitespace doesn't count toward minLength
 
 
 @pytest.mark.parametrize("item", BY_TYPE["redact"], ids=lambda i: i["id"])
@@ -62,7 +97,7 @@ def test_unredacted_input_fails_redaction_checks(item):
     assert not all(r.ok for r in ck.run_checks(item, item["input"]))
 
 
-@pytest.mark.parametrize("item", [i for i in ITEMS if i.get("output_schema")], ids=lambda i: i["id"])
+@pytest.mark.parametrize("item", [i for i in ALL_ITEMS if i.get("output_schema")], ids=lambda i: i["id"])
 def test_empty_json_fails(item):
     assert not all(r.ok for r in ck.run_checks(item, "{}"))
 
@@ -75,11 +110,13 @@ def test_every_wrong_label_fails(item):
             assert not ck.run_checks(item, label)[0].ok, label
 
 
-def test_synthetic_data_only():
+@pytest.mark.parametrize("path", [SET, WORK], ids=lambda p: p.stem)
+def test_synthetic_data_only(path):
     """Fictional values only: reserved 555-01xx phones, example domains, test card and SSN."""
-    text = SET.read_text()
+    text = path.read_text()
     assert not re.search(r"\b555-0(?!1\d\d)\d{3}\b", text)  # only the reserved 555-0100..0199 range
-    for email in re.findall(r"[\w.+-]+@([\w-]+\.[a-z]+)", text):
+    # (?<!\\) skips an escaped newline before a decorator ("\n@pytest.mark"), which isn't an email.
+    for email in re.findall(r"(?<!\\)\b[\w.+-]+@([\w-]+\.[a-z]+)", text):
         assert email.split(".")[0] == "example", email
     for card in re.findall(r"\b\d{4} \d{4} \d{4} \d{4}\b", text):
         assert card == "4111 1111 1111 1111", card

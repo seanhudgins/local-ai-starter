@@ -72,7 +72,8 @@ def _type_ok(value: Any, expected: str) -> bool:
 
 
 def schema_errors(value: Any, schema: dict, path: str = "$") -> list[str]:
-    """Errors for the subset used here: type, enum, required, properties, items, min/max, maxLength, pattern."""
+    """Errors for the subset used here: type, enum, required, properties, items, min/maxItems, min/max,
+    min/maxLength, pattern."""
     errors: list[str] = []
     if "type" in schema:
         types = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
@@ -85,6 +86,11 @@ def schema_errors(value: Any, schema: dict, path: str = "$") -> list[str]:
         for key, sub in schema.get("properties", {}).items():
             if key in value:
                 errors += schema_errors(value[key], sub, f"{path}.{key}")
+    if isinstance(value, list):
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            errors.append(f"{path}: {len(value)} items (min {schema['minItems']})")
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            errors.append(f"{path}: {len(value)} items (max {schema['maxItems']})")
     if isinstance(value, list) and "items" in schema:
         for i, v in enumerate(value):
             errors += schema_errors(v, schema["items"], f"{path}[{i}]")
@@ -94,6 +100,8 @@ def schema_errors(value: Any, schema: dict, path: str = "$") -> list[str]:
         if "maximum" in schema and value > schema["maximum"]:
             errors.append(f"{path}: {value} > {schema['maximum']}")
     if isinstance(value, str):
+        if "minLength" in schema and len(value.strip()) < schema["minLength"]:
+            errors.append(f"{path}: shorter than {schema['minLength']} characters")
         if "maxLength" in schema and len(value) > schema["maxLength"]:
             errors.append(f"{path}: longer than {schema['maxLength']} characters")
         if "pattern" in schema and not re.search(schema["pattern"], value):

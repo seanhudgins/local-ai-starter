@@ -7,7 +7,11 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git push origin main:*)",
-      "Bash(git push -u origin main:*)"
+      "Bash(git push -u origin main:*)",
+      "Bash(security find-generic-password:*)",
+      "Bash(security find-internet-password:*)",
+      "Bash(security dump-keychain:*)",
+      "Read(~/Library/Keychains/**)"
     ]
   }
 }

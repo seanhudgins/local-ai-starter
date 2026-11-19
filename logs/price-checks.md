@@ -18,7 +18,7 @@ Fees come from web sources and change often; confirm on the provider's own page 
 | Open-model host | Together, Fireworks, DeepInfra, Groq | Per-token, set by each | Reached through OpenRouter's per-provider prices |
 | Cloud platform | AWS Bedrock, Google Vertex, Azure AI Foundry | Per-token, enterprise terms | Bedrock is what Amazon Connect uses; possible enterprise column later |
 
-**Decision:** keep one paid key (OpenRouter). No change.
+**Decision:** keep OpenRouter as the only marketplace key. No change. Anthropic stays a direct key alongside it (Opus judge and tier 3); Google direct is still open (decide at v1-2).
 
 Sources: [Requesty](https://www.requesty.ai/blog/openrouter-alternatives),
 [LLM Gateway](https://llmgateway.io/blog/openrouter-alternatives),

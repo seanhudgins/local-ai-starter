@@ -142,11 +142,41 @@ def test_eval_task_maps_to_the_eval_runner_only(tmp_path):
     task = {**TASK, "check": "eval", "model": "gpt-oss:20b", "_results_dir": tmp_path}
     cmd = ri.command(task)
     assert cmd[0] == sys.executable and cmd[1].endswith(str(Path("evals") / "run.py"))
-    assert cmd[2:6] == ["run", "--models", "gpt-oss:20b", "--note"]
-    assert cmd[-2] == "--out" and cmd[-1] == str(tmp_path / "t1.results.jsonl")
+    assert cmd[2:] == ["run", "--models", "gpt-oss:20b", "--note", "inbox t1"]  # record goes to evals/runs/
 
 
 @pytest.mark.parametrize("bad", [{"model": "gpt-oss:20b --items x; rm -rf ~"}, {"expect": "gpu"}, {"id": "../x"}])
 def test_eval_task_rejects_tricks(bad):
     with pytest.raises(ValueError):
         ri.command({**TASK, "check": "eval", **bad})
+
+
+def test_try_later_leaves_the_task_pending(tmp_path, monkeypatch):
+    class Proc:
+        returncode, stdout, stderr = ri.TRY_LATER, "NOT STARTED: GPU busy before the run\n", ""
+
+    monkeypatch.setattr(ri.subprocess, "run", lambda *a, **k: Proc())
+    task = {**TASK, "check": "eval", "model": "gpt-oss:20b"}
+    assert ri.run(task, "pc1", tmp_path) == ri.TRY_LATER
+    assert ri.pending([task], "pc1", tmp_path) == [task]  # no result file, so it runs on the next pull
+
+
+def test_add_validates_before_writing(tmp_path):
+    inbox = tmp_path / "inbox.json"
+    task = ri.add("PC1", "eval", "gemma4:12b", "rerun on the 80-item set", inbox=inbox)
+    assert task["id"].endswith("-pc1-eval-gemma4-12b")
+    assert json.loads(inbox.read_text())["tasks"] == [task]
+    with pytest.raises(ValueError, match="already exists"):
+        ri.add("PC1", "eval", "gemma4:12b", "again", inbox=inbox)
+    with pytest.raises(ValueError, match="bad model tag"):
+        ri.add("PC1", "eval", "gemma4:12b; rm -rf ~", "x", inbox=inbox)
+    with pytest.raises(ValueError, match="why"):
+        ri.add("PC1", "verify", "gemma4:12b", " ", inbox=inbox)
+    assert len(json.loads(inbox.read_text())["tasks"]) == 1  # refused tasks never reach the file
+
+
+def test_add_command_line(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ri, "INBOX", tmp_path / "inbox.json")
+    assert ri.main(["add", "--machine", "PC1", "--check", "check", "--model", "gpt-oss:20b", "--why", "w"]) == 0
+    assert ri.main(["add", "--machine", "PC1", "--check", "check", "--model", "BAD TAG", "--why", "w"]) == 2
+    assert "REFUSED" in capsys.readouterr().out

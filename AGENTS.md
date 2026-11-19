@@ -15,6 +15,8 @@
 1. `STATUS.md` — where we are and what's next. **Update it before the session ends.**
 2. `docs/V1-SPEC.md` — the v1 scope and binding security rules. Where anything conflicts, V1-SPEC wins.
 5. `ops/inbox.json` — checks another machine left for this one. Run `uv run ops/run_inbox.py` at session start (the post-merge hook also runs it after `git pull`), then commit `ops/results/`. To hand work to the other machine, add a task there instead of asking the user to run it. Only `modelcheck.py` checks are allowed.
+6. `docs/WORKSPACE.md` — the map of all repos and where new things go; `docs/decisions/` — decisions 15
+   onward (1–14 are in `docs/ARCHITECTURE.md`). Don't reverse one without a new ADR that supersedes it.
 
 ## Scope: v1 only
 Build only the v1 steps in `docs/V1-SPEC.md`, in order. A step starts only when the previous one
@@ -40,6 +42,7 @@ Setup steps differ by OS: `docs/setup/PC.md` (your PC) and `docs/setup/MAC.md` (
 | What | Your PC | Mac |
 |---|---|---|
 | This repo (code, docs, configs) | `C:\projects\local-ai` | `~/projects/local-ai` |
+| Other repos | `C:\projects\<repo>` | `~/projects/<repo>` (see `docs/WORKSPACE.md`) |
 | Model weights (`OLLAMA_MODELS`) | `D:\ai\ollama` | `~/.ollama/models` (local models; see `docs/setup/MAC.md`) |
 | Open WebUI data | `D:\ai\open-webui` | `~/ai/open-webui` |
 | Hugging Face cache (`HF_HOME`) | `D:\ai\hf` | none |

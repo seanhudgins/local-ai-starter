@@ -1,7 +1,16 @@
-# Opens a pull request when a pinned GitHub Action has a newer release.
+# Opens pull requests when a pinned dependency has a newer release. CI's audit (ops/audit.py) catches
+# known vulnerabilities on every push; this keeps the pins moving between audits.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: uv
+    directory: /services/open-webui
     schedule:
       interval: monthly

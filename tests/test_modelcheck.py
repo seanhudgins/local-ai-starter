@@ -25,6 +25,7 @@ class FakeOllama:
 
     def __init__(self) -> None:
         self.caps = ["completion", "tools"]
+        self.show: dict = {"license": "Apache License\nVersion 2.0, January 2004"}  # extra /api/show fields
         self.answer = "Billing"
         self.tool_reply: dict = TOOL_REPLY
         self.size_vram = 100
@@ -61,7 +62,7 @@ class FakeOllama:
                 if body.get("model") != "m:1":
                     self.reply(404, {"error": f"model '{body.get('model')}' not found"})
                 elif self.path == "/api/show":
-                    self.reply(200, {"capabilities": fake.caps})
+                    self.reply(200, {"capabilities": fake.caps, **fake.show})
                 elif self.path == "/api/chat" and "tools" in body:
                     self.reply(200, fake.tool_reply)
                 elif self.path == "/api/chat":
@@ -91,7 +92,8 @@ def ollama():
 def test_chat_model_passes_everything(ollama):
     results = mc.check(ollama.url, "m:1")
     assert all(r.ok for r in results), [r.line() for r in results]
-    assert "80.0 tok/s" in results[0].message
+    assert not any(r.warn for r in results), [r.line() for r in results]
+    assert any("80.0 tok/s" in r.message for r in results)
 
 
 def test_wrong_answer_fails(ollama):
@@ -160,6 +162,74 @@ def test_model_not_loaded_fails(ollama):
     assert not mc.check_processor(ollama.url, "m:1", "any").ok
 
 
+# ---------- safeguards ----------
+
+GEMMA = "Gemma Terms of Use\n\nLast modified: ..."
+LLAMA = "META LLAMA 3 COMMUNITY LICENSE AGREEMENT ... Meta Platforms, Inc."
+MIT = "MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy"
+
+
+@pytest.mark.parametrize(
+    ("text", "family", "verdict"),
+    [
+        ("\n   Apache License\n   Version 2.0, January 2004\n", "Apache 2.0", "pass"),
+        (MIT, "MIT", "pass"),
+        (GEMMA, "Gemma terms", "warn"),
+        (LLAMA, "Llama / Meta license", "warn"),
+        ("Creative Commons Attribution-NonCommercial 4.0 (CC-BY-NC-4.0)", "non-commercial", "fail"),
+        ("Tongyi Qianwen LICENSE AGREEMENT", "other/unknown", "fail"),
+        ("", "none", "warn"),
+        # A restrictive license bundled with a permissive one is reported as the restrictive one.
+        ("Apache License Version 2.0\n" + GEMMA, "Gemma terms", "warn"),
+    ],
+)
+def test_license_family(text, family, verdict):
+    assert mc.license_family(text) == (family, verdict)
+
+
+def test_permissive_license_and_no_system_prompt_pass(ollama):
+    results = mc.check_safeguards(ollama.url, "m:1")
+    assert [r.line() for r in results] == ["PASS  license: Apache 2.0", "PASS  no built-in system prompt"]
+
+
+@pytest.mark.parametrize(("show", "word"), [({"license": GEMMA}, "Gemma"), ({}, "none")])
+def test_restricted_or_missing_license_warns(ollama, show, word):
+    ollama.show = show
+    lic = mc.check_safeguards(ollama.url, "m:1")[0]
+    assert lic.ok and lic.warn and word in lic.message and lic.line().startswith("WARN")
+
+
+def test_unknown_license_fails_with_its_start(ollama):
+    ollama.show = {"license": "Custom Model License v1: you may not use this for customer support."}
+    lic = mc.check_safeguards(ollama.url, "m:1")[0]
+    assert not lic.ok and "Custom Model License" in lic.message
+
+
+def test_hidden_system_prompt_warns_with_first_120_chars(ollama):
+    ollama.show = {"license": MIT, "system": "You are Acme's assistant. " + "x" * 200}
+    sysr = mc.check_safeguards(ollama.url, "m:1")[1]
+    assert sysr.ok and sysr.warn and "Acme" in sysr.message
+    assert "x" * 90 in sysr.message and "x" * 120 not in sysr.message
+
+
+def test_system_prompt_read_from_modelfile_when_field_missing(ollama):
+    ollama.show = {"license": MIT, "modelfile": 'FROM m:1\nSYSTEM "Always mention BrandCo."\nPARAMETER top_k 20'}
+    sysr = mc.check_safeguards(ollama.url, "m:1")[1]
+    assert sysr.warn and "Always mention BrandCo." in sysr.message
+
+
+def test_check_runs_safeguards_and_warnings_dont_fail(ollama, capsys):
+    ollama.show = {"license": GEMMA, "system": "Be brief."}
+    assert mc.main(["check", "m:1", "--url", ollama.url]) == 0
+    out = capsys.readouterr().out
+    assert "WARN  license: Gemma terms" in out and "2 warning(s)" in out
+
+
+def test_unknown_license_counts_as_failure(ollama):
+    ollama.show = {"license": "Some other license"}
+    assert mc.main(["safeguards", "m:1", "--url", ollama.url]) == 1
+
+
 # ---------- embedding models ----------
 
 
@@ -167,7 +237,7 @@ def test_embedding_model_gets_vector_check_not_chat(ollama):
     ollama.caps = ["embedding"]
     results = mc.check(ollama.url, "m:1")
     assert all(r.ok for r in results)
-    assert "768-number vector" in results[0].message
+    assert any("768-number vector" in r.message for r in results)
     assert not any(path == "/api/chat" for path, _ in ollama.requests)
 
 
