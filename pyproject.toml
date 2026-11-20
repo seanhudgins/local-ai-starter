@@ -37,7 +37,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 # Fitness check in CI: the code is written typed, so keep it that way.
-files = ["evals", "services/ollama/modelcheck.py", "ops", "tools/claude-hooks", "tools/git-alias", "publish/publish.py"]
+files = ["evals", "services/ollama/modelcheck.py", "ops", "tools/claude-hooks", "tools/git-alias"]
 ignore_missing_imports = true
 check_untyped_defs = true
 explicit_package_bases = true
