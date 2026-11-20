@@ -1,0 +1,14 @@
+#!/bin/sh
+# Refuse direct pushes to main: changes reach main through a pull request, after CI passes.
+# (GitHub can't enforce this on free private repos, so this hook does.) The same file is used in every repo.
+# Deliberate override for one push: ALLOW_PUSH_MAIN=1 git push ...
+# git passes: <local ref> <local sha> <remote ref> <remote sha> per line on stdin.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    if [ "$remote_ref" = "refs/heads/main" ] && [ "${ALLOW_PUSH_MAIN:-}" != "1" ]; then
+        echo "pre-push: direct pushes to main are blocked. Push a branch and open a PR:" >&2
+        echo "  git switch -c <branch> && git push -u origin <branch> && gh pr create" >&2
+        echo "  (one-off override: ALLOW_PUSH_MAIN=1 git push ...)" >&2
+        exit 1
+    fi
+done
+exit 0

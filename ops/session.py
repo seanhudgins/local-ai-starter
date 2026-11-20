@@ -8,7 +8,7 @@
 
 Prints the machine, the branch and whether it's in step with GitHub, uncommitted changes, the
 current step and next steps from STATUS.md, inbox tasks waiting for this machine, open notes from
-the planning chat (ops/chat-inbox/to-code/), and eval runs in
+the planning chat (ops/chat-inbox/to-code/), shared-tool copies that drifted, and eval runs in
 git that this machine's results database hasn't loaded yet. Claude Code runs it at session start
 (.claude/settings.json), so the "start any session" prompt isn't needed. Read-only apart from a
 `git fetch`; never fails the session (problems are printed, exit code is always 0).
@@ -23,6 +23,7 @@ import re
 import socket
 import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -103,6 +104,21 @@ def runs_not_loaded() -> int:
     return len(files - have)
 
 
+def shared_drift() -> list[str]:
+    """Warn (never fail) when copies of shared tools in sibling repos drifted from this repo's source."""
+    try:
+        r = subprocess.run(
+            [sys.executable, "-I", str(ROOT / "tools" / "sync_shared.py"), "--check"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    drift = [line for line in r.stdout.splitlines() if line.startswith("DRIFT")]
+    return [f"Shared tools: {len(drift)} copy(ies) drifted (uv run tools/sync_shared.py --check)"] if drift else []
+
+
 def main() -> int:
     host = socket.gethostname().split(".")[0].lower()
     lines = [f"Machine: {machine()}", f"Branch: {sync_state()}"]
@@ -114,6 +130,7 @@ def main() -> int:
     if notes:
         lines.append(f"Chat inbox: {len(notes)} note(s) from the planning chat (uv run ops/chat_inbox.py show <id>)")
         lines += [f"  {n}" for n in notes]
+    lines += shared_drift()
     missing = runs_not_loaded()
     if missing:
         lines.append(f"Eval runs in git not in this machine's database: {missing} (run: uv run evals/run.py sync)")

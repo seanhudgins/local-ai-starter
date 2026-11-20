@@ -16,7 +16,8 @@ service "localai-1password"); without the token, op falls back to the desktop ap
     python3 alias_filter.py install     turn the filter and the repo's hooks on in this clone (once per clone)
     python3 alias_filter.py sync        pull the map from 1Password, then refresh files still showing placeholders;
                                         refuses if 1Password lost keys this machine has (sync --force accepts that)
-    python3 alias_filter.py add REAL KEY  pull, add one name, push to 1Password (other machines then run sync)
+    python3 alias_filter.py add REAL KEY  pull, add one name, push to 1Password (other machines then run sync);
+                                        add --spelling REAL KEY adds another casing of a mapped name
     python3 alias_filter.py push        merge this machine's map into 1Password (never drops a key there;
                                         push --replace overwrites, for a deliberate removal)
     python3 alias_filter.py check       warn about placeholders on disk the map can't resolve (keys only, no names)
@@ -27,9 +28,12 @@ service "localai-1password"); without the token, op falls back to the desktop ap
     python3 alias_filter.py guard-msg FILE  commit-msg: block real names in the commit message or branch name
     python3 alias_filter.py show        list the map (prints real names: for the owner's eyes, not agents or logs)
 
-Names match whole words, ignoring case ("Mypc" and "MYPC" both become {{alias:pc}}; a checkout shows the
-map's spelling). UTF-8 and UTF-16 files (with a byte-order mark, as Windows PowerShell 5 writes) are filtered;
-other binary files pass through. Every message names keys, never real names.
+The filter replaces the map's exact spelling only, so a round trip never changes a file. The guards (pre-commit,
+commit-msg) match any casing and BLOCK, so "mypc" for a mapped "MyPC" can't reach GitHub: write the placeholder
+or the map's spelling, or add the second spelling with its own key (`add --spelling REAL KEY`). UTF-8 and
+UTF-16 files (with a byte-order mark, as Windows PowerShell 5 writes) are filtered; other files pass through,
+and the guard still scans them (as latin-1, and for UTF-16-encoded names). Every message names keys, never
+real names; printed paths are masked.
 
 Standard library only. The same file is copied into each repo (.githooks/alias_filter.py); the
 source, with tests, is local-ai's tools/git-alias/.
@@ -52,7 +56,25 @@ def map_path() -> Path:
 
 
 PLACEHOLDER = "{{{{alias:{}}}}}"  # -> {{alias:pc}}
+PLACEHOLDER_RE = re.compile(r"\{\{alias:([a-z0-9][a-z0-9-]*)\}\}")
 KEY = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def validate(terms: dict[str, str], where: str) -> dict[str, str]:
+    """Keys unique and simple; no name that could match inside a placeholder ("alias", or a key's segment,
+    e.g. a name "guest" with a key "ssid-guest"). Errors name keys only."""
+    keys = list(terms.values())
+    bad = [k for k in keys if not KEY.match(k)]
+    if bad or len(set(keys)) != len(keys):
+        raise SystemExit(f"alias map {where}: keys must be unique, lowercase a-z 0-9 '-' (bad: {bad or 'duplicates'})")
+    segments = {"alias"} | {seg for k in keys for seg in k.split("-")}
+    clash = sorted(k for real, k in terms.items() if not real.strip() or real.lower() in segments)
+    if clash:
+        raise SystemExit(
+            f"alias map {where}: the name for key(s) {', '.join(clash)} is empty, 'alias', or a key segment; "
+            "it would match inside placeholders. Rename the key."
+        )
+    return terms
 
 
 def load(path: Path | None = None) -> dict[str, str]:
@@ -60,12 +82,7 @@ def load(path: Path | None = None) -> dict[str, str]:
     path = path or map_path()
     if not path.is_file():
         return {}
-    terms = json.loads(path.read_text(encoding="utf-8")).get("terms", {})
-    keys = list(terms.values())
-    bad = [k for k in keys if not KEY.match(k)]
-    if bad or len(set(keys)) != len(keys):
-        raise SystemExit(f"alias map {path}: keys must be unique, lowercase a-z 0-9 '-' (bad: {bad or 'duplicates'})")
-    return terms
+    return validate(json.loads(path.read_text(encoding="utf-8")).get("terms", {}), str(path))
 
 
 def _pattern(term: str) -> str:
@@ -75,16 +92,58 @@ def _pattern(term: str) -> str:
     return left + re.escape(term) + right
 
 
+def _matcher(terms: dict[str, str], any_case: bool) -> tuple[re.Pattern[str], list[str]] | None:
+    """One regex: an existing placeholder (group 1, skipped) or one of the names (groups 2.., longest first, so
+    "HomeNet-IoT" wins over "HomeNet"). A single pass, so a name never matches inside a placeholder."""
+    if not terms:
+        return None
+    order = sorted(terms, key=len, reverse=True)
+    alts = [r"(\{\{alias:[a-z0-9][a-z0-9-]*\}\})"] + [f"({_pattern(real)})" for real in order]
+    return re.compile("|".join(alts), re.IGNORECASE if any_case else 0), [terms[r] for r in order]
+
+
+def _replace(text: str, terms: dict[str, str], any_case: bool) -> str:
+    m = _matcher(terms, any_case)
+    if m is None:
+        return text
+    rx, keys = m
+
+    def sub(match: re.Match[str]) -> str:
+        if match.group(1):
+            return match.group(0)
+        return PLACEHOLDER.format(keys[(match.lastindex or 2) - 2])
+
+    return rx.sub(sub, text)
+
+
 def clean(text: str, terms: dict[str, str]) -> str:
-    for real in sorted(terms, key=len, reverse=True):  # longest first: "HomeNet-IoT" before "HomeNet"
-        placeholder = PLACEHOLDER.format(terms[real])
-        text = re.sub(_pattern(real), placeholder.replace("\\", r"\\"), text, flags=re.IGNORECASE)
-    return text
+    """Names (the map's exact spelling) -> placeholders. Exact case, so smudge(clean(x)) == x always."""
+    return _replace(text, terms, any_case=False)
+
+
+def mask(text: str, terms: dict[str, str]) -> str:
+    """For printing only: every casing of every name -> its placeholder."""
+    return _replace(text, terms, any_case=True)
 
 
 def names_in(text: str, terms: dict[str, str]) -> list[str]:
-    """Keys (never names) of the real names that appear in text, any case."""
-    return sorted({k for real, k in terms.items() if re.search(_pattern(real), text, flags=re.IGNORECASE)})
+    """Keys (never names) of names that appear in text in any casing, outside placeholders."""
+    m = _matcher(terms, any_case=True)
+    if m is None:
+        return []
+    rx, keys = m
+    return sorted({keys[(x.lastindex or 2) - 2] for x in rx.finditer(text) if not x.group(1)})
+
+
+def names_in_bytes(data: bytes, terms: dict[str, str]) -> list[str]:
+    """For files that aren't UTF-8 or BOM-marked UTF-16: scan them as latin-1 text, and look for each name
+    encoded as UTF-16 (either byte order, no BOM needed, odd lengths fine) in a few casings."""
+    found = set(names_in(data.decode("latin-1"), terms))
+    for real, k in terms.items():
+        for variant in {real, real.lower(), real.upper()}:
+            if any(variant.encode(enc) in data for enc in ("utf-16-le", "utf-16-be")):
+                found.add(k)
+    return sorted(found)
 
 
 def decode(data: bytes) -> tuple[str, str, bytes] | None:
@@ -107,25 +166,30 @@ def smudge(text: str, terms: dict[str, str]) -> str:
 
 
 def guard(terms: dict[str, str]) -> list[str]:
-    """Real names in staged file names and in the staged (already cleaned) content: what would reach GitHub.
-    Reported as "file: {{alias:key}}", never the name itself."""
-    files = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"], capture_output=True, text=True, check=True
-    ).stdout.splitlines()
+    """Names (any casing) in staged file names and in the staged (already cleaned) content: what would reach
+    GitHub. Reported as "masked/path: {{alias:key}}", never the name itself."""
+    out = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"], capture_output=True, check=True
+    ).stdout
+    files = [f for f in out.decode("utf-8", errors="surrogateescape").split("\0") if f]
     hits = []
     for f in files:
-        hits += [f"{f} (file name): {PLACEHOLDER.format(k)}" for k in names_in(f, terms)]
+        shown = mask(f, terms)  # the path itself may hold a name
+        hits += [f"{shown} (file name): {PLACEHOLDER.format(k)}" for k in names_in(f, terms)]
         blob = subprocess.run(["git", "show", f":{f}"], capture_output=True, check=True).stdout
         decoded = decode(blob)
-        if decoded is None:
-            continue
-        hits += [f"{f}: {PLACEHOLDER.format(k)}" for k in names_in(decoded[0], terms)]
+        keys = names_in(decoded[0], terms) if decoded else names_in_bytes(blob, terms)
+        hits += [f"{shown}: {PLACEHOLDER.format(k)}" for k in keys]
     return hits
 
 
+SCISSORS = "# ------------------------ >8 ------------------------"
+
+
 def guard_message(message: str, terms: dict[str, str]) -> list[str]:
-    """Keys of real names in a commit message (git's comment lines skipped) or the current branch name."""
-    text = "\n".join(line for line in message.splitlines() if not line.startswith("#"))
+    """Keys of names in a commit message (every line, comments too, up to git's scissors line that starts the
+    verbose diff) or the current branch name."""
+    text = message.split(SCISSORS, 1)[0]
     branch = subprocess.run(["git", "symbolic-ref", "--short", "-q", "HEAD"], capture_output=True, text=True).stdout
     return [f"commit message: {PLACEHOLDER.format(k)}" for k in names_in(text, terms)] + [
         f"branch name: {PLACEHOLDER.format(k)}" for k in names_in(branch, terms)
@@ -137,15 +201,19 @@ def keys_in_repo() -> set[str]:
     not the files on disk, where the smudge filter has already swapped known keys back into names (so a key
     dropped from the map would otherwise go unnoticed until its name was committed in clear)."""
     keys: set[str] = set()
-    for where in (["--cached"], ["HEAD"]):
+    has_head = subprocess.run(["git", "rev-parse", "--verify", "-q", "HEAD"], capture_output=True).returncode == 0
+    for before, after in ((["--cached"], []), ([], ["HEAD"])):
+        if after and not has_head:
+            continue  # first commit: nothing committed yet
         r = subprocess.run(
-            ["git", "grep", "-h", "-o", "-I", "-E", r"\{\{alias:[a-z0-9][a-z0-9-]*\}\}", *where]
+            ["git", "grep", "-h", "-o", "-I", *before, "-E", r"\{\{alias:[a-z0-9][a-z0-9-]*\}\}", *after]
             + ["--", ":(attr:filter=alias)"],  # only files the filter swaps back; others show placeholders anyway
             capture_output=True,
             text=True,
         )
-        if r.returncode == 0:  # 1 = no match, 128 = no HEAD yet
-            keys |= set(PLACEHOLDER_RE.findall(r.stdout))
+        if r.returncode not in (0, 1):  # 1 = no match; anything else: fail closed
+            raise SystemExit(f"alias guard: git grep failed ({r.returncode}); commit blocked")
+        keys |= set(PLACEHOLDER_RE.findall(r.stdout))
     return keys
 
 
@@ -185,8 +253,6 @@ def install() -> None:
 
 
 # ---- Drift check: placeholders on disk that this machine's map can't (or didn't yet) turn back into names ----
-
-PLACEHOLDER_RE = re.compile(r"\{\{alias:([a-z0-9][a-z0-9-]*)\}\}")
 
 
 def _filtered_files() -> list[str]:
@@ -320,23 +386,26 @@ def _op(*args: str) -> str:
     return r.stdout
 
 
+ABSENT = re.compile(r"isn't an item|not found|no item|doesn't exist", re.IGNORECASE)
+
+
 def _op_exists(ref: list[str]) -> bool:
+    """True if the document exists, False only if 1Password says it's absent; any other failure (signed out,
+    no network, no access) stops, so push never creates a second copy over an unreachable one."""
     try:
-        return subprocess.run(["op", "item", "get", *ref], capture_output=True, env=_op_env()).returncode == 0
+        r = subprocess.run(["op", "item", "get", *ref], capture_output=True, text=True, env=_op_env())
     except FileNotFoundError:
+        raise SystemExit("1Password CLI (op) not found; see the README (Private names).") from None
+    if r.returncode == 0:
+        return True
+    if ABSENT.search(r.stderr):
         return False
+    raise SystemExit(f"op item get failed: {r.stderr.strip()[:300]}")
 
 
 def _parse(text: str) -> dict[str, str]:
-    """Validate map JSON the same way load() does (unique, simple keys)."""
-    terms = json.loads(text).get("terms", {})
-    keys = list(terms.values())
-    bad = [k for k in keys if not KEY.match(k)]
-    if bad or len(set(keys)) != len(keys):
-        raise SystemExit(
-            f"alias map from 1Password: keys must be unique, lowercase a-z 0-9 '-' (bad: {bad or 'duplicates'})"
-        )
-    return terms
+    """Validate map JSON the same way load() does."""
+    return validate(json.loads(text).get("terms", {}), "from 1Password")
 
 
 def _write_map(terms: dict[str, str]) -> None:
@@ -371,11 +440,16 @@ def pull(force: bool = False) -> dict[str, str]:
     return remote
 
 
-def merge(remote: dict[str, str], local: dict[str, str]) -> dict[str, str]:
+def merge(remote: dict[str, str], local: dict[str, str], allow_variant: bool = False) -> dict[str, str]:
     """remote plus local's extra names. A name mapped to two keys, or a key used for two names, stops (keys only)."""
     out = dict(remote)
     owner = {k: real for real, k in remote.items()}
     for real, k in local.items():
+        variant = next((r for r in out if r.lower() == real.lower() and r != real), None)
+        if variant is not None and real not in out and not allow_variant:
+            # one name in two casings: two keys for one name unless it was added on purpose (add --spelling)
+            there = PLACEHOLDER.format(out[variant])
+            raise SystemExit(f"map conflict: a name here is another casing of {there} in 1Password (add --spelling)")
         if real in out and out[real] != k:
             here, there = PLACEHOLDER.format(k), PLACEHOLDER.format(out[real])
             raise SystemExit(f"map conflict: one name is {here} here and {there} in 1Password")
@@ -385,7 +459,7 @@ def merge(remote: dict[str, str], local: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def push(terms: dict[str, str] | None = None, replace: bool = False) -> None:
+def push(terms: dict[str, str] | None = None, replace: bool = False, allow_variant: bool = False) -> None:
     """Merge a map into 1Password (or overwrite it, with replace), creating the document the first time."""
     terms = load() if terms is None else terms
     if not terms:
@@ -393,7 +467,7 @@ def push(terms: dict[str, str] | None = None, replace: bool = False) -> None:
     ref = _op_ref()
     exists = _op_exists(ref)
     if exists and not replace:
-        terms = merge(_parse(_op("document", "get", *ref)), terms)
+        terms = merge(_parse(_op("document", "get", *ref)), terms, allow_variant=allow_variant)
     _write_map(terms)
     path = str(map_path())
     if exists:
@@ -403,17 +477,28 @@ def push(terms: dict[str, str] | None = None, replace: bool = False) -> None:
     print(f"alias map pushed to 1Password ({len(terms)} keys). Other machines: run `alias_filter.py sync`.")
 
 
-def add(real: str, key: str) -> None:
-    """Pull first so another machine's additions aren't overwritten, then add one name and push."""
+def add(real: str, key: str, spelling: bool = False) -> None:
+    """Pull first so another machine's additions aren't overwritten, then add one name and push. A second
+    casing of a mapped name needs --spelling (and its own key), so one name doesn't end up with two keys."""
     if not KEY.match(key):
         raise SystemExit(f"key {key!r}: use lowercase a-z, 0-9 and '-'")
     terms = pull()
     if real in terms:
-        raise SystemExit(f"that name is already mapped to {{{{alias:{terms[real]}}}}}")
+        raise SystemExit(f"that name is already mapped to {PLACEHOLDER.format(terms[real])}")
+    variant = next((r for r in terms if r.lower() == real.lower()), None)
+    if variant is not None and not spelling:
+        raise SystemExit(
+            f"that name is another casing of {PLACEHOLDER.format(terms[variant])}. If both spellings occur, "
+            "add this one on purpose: alias_filter.py add --spelling REAL NEW-KEY"
+        )
     if key in terms.values():
         raise SystemExit(f"key {key!r} is already used; pick another")
+    validate({**terms, real: key}, "after add")
     terms[real] = key
-    push(terms)
+    if spelling and variant is not None:
+        push(terms, replace=False, allow_variant=True)
+    else:
+        push(terms)
 
 
 def _in_filtered_repo() -> bool:
@@ -441,6 +526,9 @@ def main(argv: list[str]) -> int:
     if cmd == "add" and len(argv) == 4:
         add(argv[2], argv[3])
         return 0
+    if cmd == "add" and len(argv) == 5 and argv[2] == "--spelling":
+        add(argv[3], argv[4], spelling=True)
+        return 0
     if cmd == "push":
         push(replace="--replace" in argv[2:])
         return 0
@@ -457,9 +545,18 @@ def main(argv: list[str]) -> int:
         return 0
     if cmd == "guard-msg" and len(argv) == 3:
         terms = load()
-        hits = guard_message(Path(argv[2]).read_text(encoding="utf-8", errors="replace"), terms) if terms else []
+        if not terms:
+            print(
+                f"alias guard: no map at {map_path()}; can't check the commit message. Commit blocked.", file=sys.stderr
+            )
+            return 1
+        hits = guard_message(Path(argv[2]).read_text(encoding="utf-8", errors="replace"), terms)
         if hits:
-            print("alias guard: private names in " + "; ".join(hits) + ". Reword using the key.", file=sys.stderr)
+            print(
+                "alias guard: private names in " + "; ".join(hits) + ". Write the placeholder (or the map's"
+                " spelling, which the filter replaces) instead.",
+                file=sys.stderr,
+            )
             return 1
         return 0
     if cmd == "guard":
@@ -478,7 +575,9 @@ def main(argv: list[str]) -> int:
         hits = guard(terms)
         if hits:
             print(
-                "alias guard: private names would reach GitHub. Is the filter on? (alias_filter.py install)",
+                "alias guard: private names would reach GitHub. The filter replaces only the map's exact spelling:\n"
+                "  write the placeholder or that spelling, add a second spelling (add --spelling REAL KEY),\n"
+                "  or turn the filter on for this file type (.gitattributes; alias_filter.py install).",
                 file=sys.stderr,
             )
             print("\n".join("  " + h for h in hits), file=sys.stderr)

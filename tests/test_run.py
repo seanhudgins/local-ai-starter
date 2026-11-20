@@ -452,7 +452,8 @@ def S(passed, n=4, judge=None, judged=0, secs=10.0):  # noqa: N802
 @pytest.mark.parametrize(
     ("a", "b", "needs", "oa", "ob", "want"),
     [
-        (S(4), S(3), 0, "CN", "US", "a"),  # one more item passing all rules is a real win
+        (S(4), S(2), 0, "CN", "US", "a"),  # two more items passing all rules is a real win (WIN_ITEMS)
+        (S(4), S(3), 0, "CN", "US", "b"),  # one item is noise on 10-item sets: a tie, which goes to the US model
         (S(4), S(4), 0, "CN", "US", "b"),  # a tie goes to the American model
         (S(4), S(4), 0, "US", "US", ""),  # same origin: a plain tie
         (S(4, judge=4.6, judged=4), S(4, judge=4.2, judged=4), 4, "CN", "US", "a"),  # 0.4 judge points
@@ -507,3 +508,9 @@ def test_run_records_its_set_and_later_commands_reload_it(con):
     assert tuple(row) == ("my-work.jsonl", er.fingerprint(path.read_bytes()))
     assert er.run_set(con, run_id) == path
     assert er.run_set(con, "no-such-run") == er.DEFAULT_SET
+
+
+def test_machine_role_replaces_hostname():
+    assert er.machine_role("Windows") == "pc"
+    assert er.machine_role("Darwin") == "mac"
+    assert er.machine_role("Linux") == "linux"

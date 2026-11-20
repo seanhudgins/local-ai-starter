@@ -14,7 +14,7 @@
 		// Your devices (Mac, phone, tablet) may reach your PC on two ports only:
 		//   443  = Open WebUI over HTTPS through `tailscale serve`. Open WebUI itself stays
 		//          on 127.0.0.1:8080, so 8080 is never reachable from the tailnet.
-		//   4000 = LiteLLM gateway (v1-4; nothing listens there until then)
+		//   4000 = LiteLLM gateway (v1-2; nothing listens there until then)
 		// Ollama's 11434 is not listed, so it stays unreachable even if it were ever
 		// bound to more than 127.0.0.1.
 		// There is no rule between your own devices, so the Mac and phone can't reach each

@@ -11,10 +11,16 @@ gitleaks git --pre-commit --staged --no-banner || exit 1
 if [ -f publish/publish.py ]; then
     if command -v uv >/dev/null 2>&1; then
         uv run --no-project --quiet python -I publish/publish.py --check || exit 1
-    elif command -v python3 >/dev/null 2>&1; then
-        python3 -I publish/publish.py --check || exit 1
     else
-        echo "Neither uv nor python3 found: can't run the personal-details scan. Commit blocked." >&2
-        exit 1
+        # python3 on macOS and Linux; on Windows "python3" can be the Microsoft Store stub, which fails, so probe it.
+        PY=""
+        for c in python3 python; do
+            if command -v "$c" >/dev/null 2>&1 && "$c" -c "" >/dev/null 2>&1; then PY=$c; break; fi
+        done
+        if [ -z "$PY" ]; then
+            echo "Neither uv nor a working python found: can't run the personal-details scan. Commit blocked." >&2
+            exit 1
+        fi
+        "$PY" -I publish/publish.py --check || exit 1
     fi
 fi

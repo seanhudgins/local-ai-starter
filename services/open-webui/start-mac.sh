@@ -30,7 +30,7 @@ export UV_PROJECT_ENVIRONMENT="$venv_dir"
 # Where Open WebUI keeps its database, uploads and secret key.
 export DATA_DIR="$data_dir"
 
-# Local Ollama only; no OpenAI-style providers until the LiteLLM gateway (v1-4).
+# Local Ollama only; no OpenAI-style providers until the LiteLLM gateway (v1-2).
 export OLLAMA_BASE_URL="$ollama_url"
 export ENABLE_OPENAI_API="False"
 

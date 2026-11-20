@@ -17,6 +17,7 @@ This is what Claude Code builds. Everything not listed here is **Later**.
 - **Mac local models:** the Mac may run Ollama for offline/travel use, bigger models and coding, under the same security rules (`docs/setup/MAC.md`). Your PC stays the only home for the gateway, MCP server, evals and provider keys.
 
 ## Build order
+
 | Step | Machine | What | Done when |
 |---|---|---|---|
 | **v1-0** Secure base | **[Your PC]** + each device | Done 2026-11-04. Tailscale (MFA, deny-by-default policy, device approval), Ollama on 127.0.0.1, Open WebUI published tailnet-only; Mac runs its own models behind a per-app firewall; every model hash-checked, first-loaded with no network, tool-call tested | Chat from Mac and phone over Tailscale; `check-edge.sh` shows only 443 open |
@@ -77,7 +78,7 @@ Model names per tier live in `router/` config, never in code. Sonnet 5.5 is adde
 
 ## Model-origin rule
 Wherever a Chinese model is a candidate (local or OpenRouter), the closest American open-weight model that fits the same machine is tested next to it on the same eval. Decided **per task type** (redaction, summary, extraction, ...):
-1. **Quality winner:** more items passing all rule checks wins; equal rule results go to the higher judge average. A real win needs **1+ item or 0.3 judge points**; anything smaller is a tie, and **ties go to the American model**. An item stuck at the token cap counts as a fail.
+1. **Quality winner:** more items passing all rule checks wins; equal rule results go to the higher judge average. A real win needs **2+ items or 0.3 judge points** (2 since 2026-11-20: one item is noise on 10-item sets, so results are indicative until the sets grow); anything smaller is a tie, and **ties go to the American model**. An item stuck at the token cap counts as a fail.
 2. **Cost:** $/task. Cloud: token price incl. OpenRouter's fee. Local: seconds per item × the machine's typical draw under load (watts, in `router/` config) × the utility's time-of-use rate at run time (your PC's clock). Electricity is a fraction of a cent per item, so between two local models on one machine this is a speed comparison. Measured watts replace the assumed ones with the v1-4 benchmark report.
 3. **Who stays:**
    - Chinese model wins: keep it, plus the closest American model as fallback.

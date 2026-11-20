@@ -190,10 +190,15 @@ def test_op_runs_as_service_account_when_token_stored(monkeypatch):
 # ---- Hardening from the 2026-11-20 review ----
 
 
-def test_clean_ignores_case_and_smudge_restores_map_spelling():
-    assert af.clean("pcname, Pcname and PCNAME", TERMS) == "{{alias:pc}}, {{alias:pc}} and {{alias:pc}}"
+def test_clean_is_exact_case_and_guard_any_case():
+    # The filter only replaces the map's spelling, so a round trip never changes a file...
+    text = "pcname, Pcname and PCNAME"
+    assert af.clean(text, TERMS) == "pcname, Pcname and {{alias:pc}}"
+    assert af.smudge(af.clean(text, TERMS), TERMS) == text
+    # ...and the guard sees every casing, so the other two would block the commit.
     assert af.names_in("ask alex", TERMS) == ["buddy"]
     assert af.names_in("alexandria", TERMS) == []
+    assert af.mask("pcname-notes", TERMS) == "{{alias:pc}}-notes"
 
 
 def _repo(tmp_path, monkeypatch, terms=TERMS):
@@ -205,6 +210,7 @@ def _repo(tmp_path, monkeypatch, terms=TERMS):
     git(repo, "init", "-q", "-b", "main")
     git(repo, "config", "user.email", "t@example.com")
     git(repo, "config", "user.name", "t")
+    git(repo, "config", "core.autocrlf", "false")  # Windows runners default to true, which would store LF
     (repo / ".gitattributes").write_text("*.md filter=alias\n*.ps1 filter=alias\n")
     monkeypatch.chdir(repo)
     return repo, amap
@@ -216,8 +222,8 @@ def test_guard_catches_lowercase_names_and_file_names(tmp_path, monkeypatch):
     (repo / "pcname-notes.txt").write_text("netco outage\n")  # not filtered, lowercase name, name in the path
     git(repo, "add", "-A")
     hits = af.guard(af.load())
-    assert "pcname-notes.txt (file name): {{alias:pc}}" in hits
-    assert "pcname-notes.txt: {{alias:isp}}" in hits
+    assert "{{alias:pc}}-notes.txt (file name): {{alias:pc}}" in hits  # the printed path is masked too
+    assert "{{alias:pc}}-notes.txt: {{alias:isp}}" in hits
     assert not any("PCNAME" in h or "NetCo" in h for h in hits)
 
 
@@ -303,3 +309,93 @@ def test_push_conflicts_name_keys_only(fake_op):
     assert "PCNAME" not in str(exc.value)
     with pytest.raises(SystemExit, match="key 'pc'"):
         af.push({"OtherPC": "pc"})
+
+
+# ---- Fixes from the checkpoint review of PR #23 (2026-11-20) ----
+
+
+def test_names_never_match_inside_placeholders():
+    terms = {"Guestnet": "ssid-guestnet", "NetCo": "isp"}
+    once = af.clean("Guestnet via NetCo", terms)
+    assert once == "{{alias:ssid-guestnet}} via {{alias:isp}}"
+    assert af.clean(once, terms) == once  # cleaning twice changes nothing (no nested placeholders)
+    assert af.names_in(once, terms) == []  # a cleaned placeholder isn't a leak
+
+
+@pytest.mark.parametrize("terms", [{"Guest": "ssid-guest"}, {"Alias": "x"}, {"pc": "pc-desk"}, {" ": "blank"}])
+def test_load_rejects_names_that_could_match_inside_placeholders(tmp_path, terms):
+    p = tmp_path / "aliases.json"
+    p.write_text(json.dumps({"terms": terms}))
+    with pytest.raises(SystemExit) as exc:
+        af.load(p)
+    assert "Rename the key" in str(exc.value)
+    assert all(k in str(exc.value) for k in terms.values())  # names the key; the name itself isn't printed
+
+
+def test_guard_message_accepts_a_key_in_a_placeholder(tmp_path, monkeypatch):
+    _repo(tmp_path, monkeypatch)
+    terms = {"Guestnet": "ssid-guestnet"}  # (load() would refuse this map; the matcher is safe anyway)
+    assert af.guard_message("Fix {{alias:ssid-guestnet}} password\n", terms) == []
+
+
+def test_keys_in_repo_reads_the_index_too(tmp_path, monkeypatch):
+    repo, _ = _repo(tmp_path, monkeypatch)
+    (repo / "a.md").write_text("{{alias:isp}}\n")
+    git(repo, "add", "-A")  # staged only, no commit yet (no HEAD)
+    assert af.keys_in_repo() == {"isp"}
+
+
+def test_guard_message_checks_comment_lines_until_scissors(tmp_path, monkeypatch):
+    repo, _ = _repo(tmp_path, monkeypatch)
+    msg = "Subject\n# a comment naming PCNAME\n"
+    assert af.guard_message(msg, af.load()) == ["commit message: {{alias:pc}}"]
+    verbose = "Subject\n" + af.SCISSORS + "\ndiff naming PCNAME\n"
+    assert af.guard_message(verbose, af.load()) == []
+
+
+def test_guard_message_blocks_without_a_map(tmp_path, monkeypatch, capsys):
+    repo, amap = _repo(tmp_path, monkeypatch)
+    amap.unlink()
+    msg = tmp_path / "MSG"
+    msg.write_text("anything\n")
+    assert af.main(["x", "guard-msg", str(msg)]) == 1
+    assert "no map" in capsys.readouterr().err
+
+
+def test_guard_scans_non_utf8_files(tmp_path, monkeypatch):
+    repo, _ = _repo(tmp_path, monkeypatch)
+    af.install()
+    (repo / "latin.txt").write_bytes(b"caf\xe9 PCNAME\n")  # latin-1, not UTF-8
+    (repo / "nobom.bin").write_bytes("x NetCo y".encode("utf-16-le") + b"\x00\xff\xfe\x01")  # UTF-16, no BOM
+    (repo / "odd.ps1").write_bytes(b"\xff\xfe" + "Alex".encode("utf-16-le") + b"\x00")  # BOM, odd length
+    git(repo, "add", "-A")
+    hits = af.guard(af.load())
+    assert "latin.txt: {{alias:pc}}" in hits
+    assert "nobom.bin: {{alias:isp}}" in hits
+    assert "odd.ps1: {{alias:buddy}}" in hits
+
+
+def test_op_exists_tells_absent_from_failure(monkeypatch):
+    class R:
+        def __init__(self, code, err):
+            self.returncode, self.stderr = code, err
+
+    monkeypatch.setattr(af, "_op_env", lambda: {})
+    monkeypatch.setattr(af.subprocess, "run", lambda *a, **k: R(0, ""))
+    assert af._op_exists(["doc"]) is True
+    monkeypatch.setattr(af.subprocess, "run", lambda *a, **k: R(1, '[ERROR] "doc" isn\'t an item in the vault'))
+    assert af._op_exists(["doc"]) is False
+    monkeypatch.setattr(af.subprocess, "run", lambda *a, **k: R(1, "[ERROR] You are not currently signed in"))
+    with pytest.raises(SystemExit, match="signed in"):
+        af._op_exists(["doc"])
+
+
+def test_merge_and_add_catch_a_second_casing(fake_op):
+    with pytest.raises(SystemExit, match="another casing") as exc:
+        af.push({"pcname": "desktop"})
+    assert "pcname" not in str(exc.value).lower().replace("{{alias:pc}}", "")
+    af._write_map(TERMS)
+    with pytest.raises(SystemExit, match="add --spelling"):
+        af.add("pcname", "pc-lower")
+    af.add("pcname", "pc-lower", spelling=True)  # deliberate: both spellings occur
+    assert json.loads(fake_op.doc)["terms"]["pcname"] == "pc-lower"

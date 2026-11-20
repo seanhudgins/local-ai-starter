@@ -19,7 +19,7 @@ $env:UV_PROJECT_ENVIRONMENT = $cfg.venvDir
 # Where Open WebUI keeps its database, uploads and secret key.
 $env:DATA_DIR = $cfg.dataDir
 
-# Local Ollama only; no OpenAI-style providers until the LiteLLM gateway (v1-4).
+# Local Ollama only; no OpenAI-style providers until the LiteLLM gateway (v1-2).
 $env:OLLAMA_BASE_URL   = $cfg.ollamaUrl
 $env:ENABLE_OPENAI_API = "False"
 

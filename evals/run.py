@@ -25,7 +25,7 @@ import contextlib
 import hashlib
 import json
 import os
-import socket
+import platform
 import sqlite3
 import subprocess
 import sys
@@ -110,6 +110,13 @@ def connect(db: Path = DEFAULT_DB) -> sqlite3.Connection:
                 con.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
     con.commit()
     return con
+
+
+def machine_role(system: str = "") -> str:
+    """The machine's role for new run records: "pc" (the Windows home node) or "mac" (the edge device), not the
+    hostname, so records can be published. Older records keep their hostname; both read the same."""
+    system = system or platform.system()
+    return {"Windows": "pc", "Darwin": "mac"}.get(system, system.lower() or "unknown")
 
 
 def fingerprint(data: bytes) -> str:
@@ -316,7 +323,7 @@ def run(
         (
             run_id,
             datetime.now().isoformat(timespec="seconds"),
-            socket.gethostname().split(".")[0],
+            machine_role(),
             version,
             set_file.name,
             note,
@@ -584,7 +591,10 @@ def report(con: sqlite3.Connection, run_id: str | None = None) -> str:
 # ---------- compare: the model-origin rule (docs/V1-SPEC.md), applied per task type ----------
 
 REGISTRY = ROOT / "router" / "models.json"
-WIN_ITEMS = 1  # a real win: at least this many more items passing every rule check...
+# A real win: at least this many more items passing every rule check... With 10 items per task type, one item
+# is 10%, inside run-to-run noise for a single run, so one item decided too much (a "summary win" was
+# retracted on 2026-11-13). Two items until the sets grow; results stay labelled indicative.
+WIN_ITEMS = 2
 WIN_JUDGE = 0.3  # ...or, with equal rule results, this much higher judge average
 ROUTINE_JUDGE = 4.0  # routine bar: every item passes all rules and the judge average is at least this
 CHEAPER = 0.25  # a model must be at least this much cheaper to keep a place on cost

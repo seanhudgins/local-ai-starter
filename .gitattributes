@@ -1,3 +1,5 @@
 * text=auto eol=lf
 *.ps1 text eol=crlf
 *.cmd text eol=crlf
+.githooks/* text eol=lf
+tools/git-alias/hooks/* text eol=lf
